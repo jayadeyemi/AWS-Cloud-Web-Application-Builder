@@ -7,7 +7,7 @@ read -p "Enter your Cloud9 IP address (e.g., 203.0.113.30): " CLOUD9_IP
 
 # Phase 1: VPC, Subnets, and EC2 with MySQL
 function phase1() {
-    echo "Starting Phase 1: Creating VPC and associated resources"
+    echo "Starting Phase 1: Setting up Key Pairs"
     # Generate a Key Pair for EC2 instances
     KEY_NAME="LabKeyPair"
     aws ec2 create-key-pair --key-name $KEY_NAME --query 'KeyMaterial' --output text > $KEY_NAME.pem
@@ -18,6 +18,7 @@ function phase1() {
     aws ec2 create-key-pair --key-name $ASG_KEY_NAME --query 'KeyMaterial' --output text > $ASG_KEY_NAME.pem
     chmod 400 $ASG_KEY_NAME.pem
 
+    echo " Creating VPC"
     # Create VPC
     VPC_ID=$(aws ec2 create-vpc --cidr-block 192.168.0.0/16 --query 'Vpc.VpcId' --output text)
     aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=Lab-VPC
@@ -25,12 +26,11 @@ function phase1() {
 
     # Create Subnets with tagging
    # Create first public subnet and enable auto-assign public IP
+   echo "Creating Subnets"
     PUB_SUBNET1=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.1.0/24 --availability-zone us-east-1a --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PUB_SUBNET1 --tags Key=Name,Value=Lab-PublicSubnet1
-    aws ec2 modify-subnet-attribute --subnet-id $PUB_SUBNET1 --map-public-ip-on-launch
     PUB_SUBNET2=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.2.0/24 --availability-zone us-east-1b --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PUB_SUBNET2 --tags Key=Name,Value=Lab-PublicSubnet2
-    aws ec2 modify-subnet-attribute --subnet-id $PUB_SUBNET2 --map-public-ip-on-launch
     PRIV_SUBNET1=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.3.0/24 --availability-zone us-east-1a --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PRIV_SUBNET1 --tags Key=Name,Value=Lab-PrivateSubnet1
     PRIV_SUBNET2=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.4.0/24 --availability-zone us-east-1b --query 'Subnet.SubnetId' --output text)
@@ -39,36 +39,45 @@ function phase1() {
     aws ec2 create-tags --resources $DB_SUBNET1 --tags Key=Name,Value=Lab-DBSubnet1
     DB_SUBNET2=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.6.0/24 --availability-zone us-east-1b --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $DB_SUBNET2 --tags Key=Name,Value=Lab-DBSubnet2
+    aws ec2 wait subnet-available --subnet-ids $PUB_SUBNET1 $PUB_SUBNET2 $PRIV_SUBNET1 $PRIV_SUBNET2 $DB_SUBNET1 $DB_SUBNET2
+    aws ec2 modify-subnet-attribute --subnet-id $PUB_SUBNET1 --map-public-ip-on-launch
+    aws ec2 modify-subnet-attribute --subnet-id $PUB_SUBNET2 --map-public-ip-on-launch
 
+    echo "Creating Main Route Table"
+    # Main route table for Private subnets
+    MAIN_ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" --query "RouteTables[0].RouteTableId" --output text)
+    aws wait route-table-available --route-table-ids $MAIN_ROUTE_TABLE_ID
+    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1
+    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2
+
+    echo "Creating Public Route Table"
+    # Public route table
+    PUB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
+    aws ec2 create-tags --resources $PUB_ROUTE_TABLE --tags Key=Name,Value=Lab-PublicRouteTable
+    aws ec2 wait route-table-available --route-table-ids $PUB_ROUTE_TABLE
+    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET1
+    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET2
+
+    echo "Creating DB Route Table"
+    # DB route table
+    DB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
+    aws ec2 create-tags --resources $DB_ROUTE_TABLE --tags Key=Name,Value=Lab-DBRouteTable
+    aws ec2 wait route-table-available --route-table-ids $DB_ROUTE_TABLE
+    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1
+    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2
+    
     # Create and attach IGW
     IGW_ID=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)
     aws ec2 create-tags --resources $IGW_ID --tags Key=Name,Value=Lab-IGW
     aws ec2 attach-internet-gateway --vpc-id $VPC_ID --internet-gateway-id $IGW_ID
+    aws ec2 create-route --route-table-id $PUB_ROUTE_TABLE --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
 
     # Create NAT Gateway and route table configuration
     EIP_ALLOC=$(aws ec2 allocate-address --query 'AllocationId' --output text)
     NAT_GW_ID=$(aws ec2 create-nat-gateway --subnet-id $PUB_SUBNET1 --allocation-id $EIP_ALLOC --query 'NatGateway.NatGatewayId' --output text)
     aws ec2 create-tags --resources $NAT_GW_ID --tags Key=Name,Value=Lab-NAT
     aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_GW_ID
-
-    # Main route table for Private subnets
-    MAIN_ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" --query "RouteTables[0].RouteTableId" --output text)
     aws ec2 create-route --route-table-id $MAIN_ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_GW_ID
-    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1
-    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2
-
-    # Public route table
-    PUB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
-    aws ec2 create-tags --resources $PUB_ROUTE_TABLE --tags Key=Name,Value=Lab-PublicRouteTable
-    aws ec2 create-route --route-table-id $PUB_ROUTE_TABLE --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
-    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET1
-    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET2
-
-    # DB route table
-    DB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
-    aws ec2 create-tags --resources $DB_ROUTE_TABLE --tags Key=Name,Value=Lab-DBRouteTable
-    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1
-    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2
 
     # Create Security Group
     LAB_SG=$(aws ec2 create-security-group --group-name Lab-Server-SG --description "Lab Server Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
