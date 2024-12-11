@@ -2,20 +2,21 @@
 
 # Get user's IP for SSH access
 read -p "Enter your current IP address (e.g., 203.0.113.25): " USER_IP
+read -p "Enter your Cloud9 IP address (e.g., 203.0.113.30): " CLOUD9_IP 
 
-# Generate a Key Pair for EC2 instances
-KEY_NAME="LabKeyPair"
-aws ec2 create-key-pair --key-name $KEY_NAME --query 'KeyMaterial' --output text > $KEY_NAME.pem
-chmod 400 $KEY_NAME.pem
-
-# Generate a Key Pair for Auto Scaling Group instances
-ASG_KEY_NAME="LabASGKeyPair"
-aws ec2 create-key-pair --key-name $ASG_KEY_NAME --query 'KeyMaterial' --output text > $ASG_KEY_NAME.pem
-chmod 400 $ASG_KEY_NAME.pem
 
 # Phase 1: VPC, Subnets, and EC2 with MySQL
 function phase1() {
     echo "Starting Phase 1: Creating VPC and associated resources"
+    # Generate a Key Pair for EC2 instances
+    KEY_NAME="LabKeyPair"
+    aws ec2 create-key-pair --key-name $KEY_NAME --query 'KeyMaterial' --output text > $KEY_NAME.pem
+    chmod 400 $KEY_NAME.pem
+
+    # Generate a Key Pair for Auto Scaling Group instances
+    ASG_KEY_NAME="LabASGKeyPair"
+    aws ec2 create-key-pair --key-name $ASG_KEY_NAME --query 'KeyMaterial' --output text > $ASG_KEY_NAME.pem
+    chmod 400 $ASG_KEY_NAME.pem
 
     # Create VPC
     VPC_ID=$(aws ec2 create-vpc --cidr-block 192.168.0.0/16 --query 'Vpc.VpcId' --output text)
@@ -47,17 +48,31 @@ function phase1() {
     aws ec2 create-tags --resources $NAT_GW_ID --tags Key=Name,Value=Lab-NAT
     aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_GW_ID
 
-    # Create Route Table and associate with private subnets
-    PRIV_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
-    aws ec2 create-route --route-table-id $PRIV_ROUTE_TABLE --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_GW_ID
-    aws ec2 associate-route-table --route-table-id $PRIV_ROUTE_TABLE --subnet-id $PRIV_SUBNET1
-    aws ec2 associate-route-table --route-table-id $PRIV_ROUTE_TABLE --subnet-id $PRIV_SUBNET2
+    # Main route table for Private subnets
+    MAIN_ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" --query "RouteTables[0].RouteTableId" --output text)
+    aws ec2 create-route --route-table-id $MAIN_ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_GW_ID
+    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1
+    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2
+
+    # Public route table
+    PUB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
+    aws ec2 create-tags --resources $PUB_ROUTE_TABLE --tags Key=Name,Value=Lab-PublicRouteTable
+    aws ec2 create-route --route-table-id $PUB_ROUTE_TABLE --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
+    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET1
+    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET2
+
+    # DB route table
+    DB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
+    aws ec2 create-tags --resources $DB_ROUTE_TABLE --tags Key=Name,Value=Lab-DBRouteTable
+    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1
+    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2
 
     # Create Security Group
     LAB_SG=$(aws ec2 create-security-group --group-name Lab-Server-SG --description "Lab Server Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $USER_IP/32
-
+    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $CLOUD9_IP/32 
+    
     # Enable Session Manager for EC2 instances
     INSTANCE_PROFILE_NAME="LabInstanceProfile"
     ROLE_NAME="AmazonSSMRoleForInstancesQuickSetup"
@@ -377,46 +392,38 @@ function phase5() {
     echo "Phase 5 Complete: All resources checked and deleted as necessary."
 }
 
-## Execute Phases with Confirmation
-
-phase1
-read -p "Continue to Phase 2? (yes/no): " cont
-if [ "$cont" == "yes" ]; then
-    phase2
-    read -p "Continue to Phase 3? (yes/no): " cont
-    if [ "$cont" == "yes" ]; then
+# Execute Phases with Confirmation
+while true; do
+    # Phase 1
+    read -p "Start Phase 1? (yes/skip): " cont
+    if [[ "$cont" == "yes" ]]; then
+        phase1
+    fi
+    # Phase 2
+    read -p "Continue to Phase 2? (yes/skip): " cont
+    if [[ "$cont" == "yes" ]]; then
+        phase2
+    fi
+    # Phase 3
+    read -p "Continue to Phase 3? (yes/skip): " cont
+    if [[ "$cont" == "yes" ]]; then
         phase3
-        while true; do
-            read -p "Continue to Phase 4? (yes/no): " cont
-            if [ "$cont" == "yes" ]; then
-                phase4
-            else
-                echo "Would you like to proceed to Phase 5 (cleanup)? (yes/no): "
-                read cont
-                if [ "$cont" == "yes" ]; then
-                    phase5
-                    break
-                else
-                    echo "Exiting. All created resources still active..."
-                    break
-                fi
-            fi
-        done
-    else
-        echo "Would you like to proceed to Phase 5 (cleanup)? (yes/no): "
-        read cont
-        if [ "$cont" == "yes" ]; then
+    fi  
+    # Phase 4
+    read -p "Continue to Phase 4? (yes/skip): " cont
+    if [[ "$cont" == "yes" ]]; then
+        phase4
+    fi   
+    # Phase 5 (Cleanup) with nested loop
+    while true; do
+        read -p "Proceed to Phase 5 (cleanup)? (yes/exit): " cont
+        if [[ "$cont" == "yes" ]]; then
             phase5
         else
-            echo "Exiting. All created resources still active..."
+            echo "Exiting Phase 5 and the script."
+            exit 0
         fi
-    fi
-else
-    echo "Would you like to proceed to Phase 5 (cleanup)? (yes/no): "
-    read cont
-    if [ "$cont" == "yes" ]; then
-        phase5
-    else
-        echo "Exiting. All created resources still active..."
-    fi
-fi
+    done
+    echo "All phases processed. Exiting now..."
+    break
+done
