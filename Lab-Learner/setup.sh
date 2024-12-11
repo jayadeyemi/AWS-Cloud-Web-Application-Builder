@@ -49,8 +49,8 @@ function phase1() {
     echo "Creating Main Route Table"
     # Main route table for Private subnets
     MAIN_ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" --query "RouteTables[0].RouteTableId" --output text)
-    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1
-    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2
+    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1 > /dev/null
+    aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2 > /dev/null
 
     # Assigning PRIV_ROUTE_TABLE to MAIN_ROUTE_TABLE_ID to avoid undefined variable usage later
     PRIV_ROUTE_TABLE=$MAIN_ROUTE_TABLE_ID
@@ -59,15 +59,15 @@ function phase1() {
     # Public route table
     PUB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
     aws ec2 create-tags --resources $PUB_ROUTE_TABLE --tags Key=Name,Value=Lab-PublicRouteTable
-    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET1
-    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET2
+    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET1 > /dev/null
+    aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET2 > /dev/null
 
     echo "Creating DB Route Table"
     # DB route table
     DB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
     aws ec2 create-tags --resources $DB_ROUTE_TABLE --tags Key=Name,Value=Lab-DBRouteTable
-    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1
-    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2
+    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1 > /dev/null
+    aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2 > /dev/null
 
     echo "Creating Internet Gateway"
     # Create and attach IGW
@@ -83,14 +83,14 @@ function phase1() {
     NAT_GW_ID=$(aws ec2 create-nat-gateway --subnet-id $PUB_SUBNET1 --allocation-id $EIP_ALLOC --query 'NatGateway.NatGatewayId' --output text)
     aws ec2 create-tags --resources $NAT_GW_ID --tags Key=Name,Value=Lab-NAT
     aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_GW_ID
-    aws ec2 create-route --route-table-id $MAIN_ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_GW_ID
+    aws ec2 create-route --route-table-id $MAIN_ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_GW_ID > /dev/null
 
     echo "Creating Security Groups"
     # Create Security Group
     LAB_SG=$(aws ec2 create-security-group --group-name Lab-Server-SG --description "Lab Server Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
-    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
-    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $USER_IP/32
-    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $CLOUD9_IP/32
+    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0 > /dev/null
+    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $USER_IP/32 > /dev/null
+    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $CLOUD9_IP/32 > /dev/null
 
     # Enable Session Manager for EC2 instances
     INSTANCE_PROFILE_NAME="LabInstanceProfile"
@@ -126,7 +126,7 @@ function phase2() {
 
     echo "Creating secret in Secrets Manager"
     # Create a secret in Secrets Manager
-    SECRET_NAME="Lab-ProjectSecret"
+    SECRET_NAME="LabProjSecret"
     SECRET_ARN=$(aws secretsmanager create-secret --name $SECRET_NAME --description "RDS credentials for LabRDS" \
         --secret-string '{"username":"admin","password":"student12"}' --query 'ARN' --output text)
 
@@ -134,17 +134,26 @@ function phase2() {
     # Create DB Subnet Group
     aws rds create-db-subnet-group --db-subnet-group-name $DBSubnetGroup --db-subnet-group-description "Lab RDS Subnet Group" \
     --subnet-ids $DB_SUBNET1 $DB_SUBNET2
-    aws rds wait db-subnet-group-available --db-subnet-group-name $DBSubnetGroup
 }
 
 function phase21() {
     # Create RDS Database (use the previously created DB subnet group)
     echo "Creating RDS MySQL instance..."
-    RDS_INSTANCE=$(aws rds create-db-instance --db-instance-identifier LabRDS --allocated-storage 20 \
-    --db-instance-class db.t2.micro --engine mysql --master-username admin --master-user-password student12 \
-    --vpc-security-group-ids $RDS_SG --db-subnet-group-name $DBSubnetGroup \
-    --availability-zone us-east-1b --backup-retention-period 1 --no-enable-performance-insights \
-    --tags Key=Name,Value=LabRDS --query 'DBInstance.DBInstanceIdentifier' --output text)
+    RDS_INSTANCE=$(aws rds create-db-instance --db-instance-identifier LabRDS \
+    --allocated-storage 20 \
+    --db-instance-class db.t3.micro \
+    --engine mysql \
+    --master-username admin \
+    --master-user-password student12 \
+    --vpc-security-group-ids $RDS_SG \
+    --db-subnet-group-name $DBSubnetGroup \
+    --availability-zone us-east-1b \
+    --backup-retention-period 1 \
+    --no-enable-performance-insights \
+    --tags Key=Name,Value=LabRDS Key=Environment,Value=Dev \
+    --query 'DBInstance.DBInstanceIdentifier' \
+    --output text)
+
     aws rds wait db-instance-available --db-instance-identifier $RDS_INSTANCE
     RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier $RDS_INSTANCE --query 'DBInstances[0].Endpoint.Address' --output text)
 
