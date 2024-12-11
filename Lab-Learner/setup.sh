@@ -73,6 +73,7 @@ function phase1() {
     echo "Creating NAT Gateway"
     # Create NAT Gateway and route table configuration
     EIP_ALLOC=$(aws ec2 allocate-address --query 'AllocationId' --output text)
+    aws ec2 create-tags --resources $EIP_ALLOC --tags Key=Name,Value="Project EIP"
     NAT_GW_ID=$(aws ec2 create-nat-gateway --subnet-id $PUB_SUBNET1 --allocation-id $EIP_ALLOC --query 'NatGateway.NatGatewayId' --output text)
     aws ec2 create-tags --resources $NAT_GW_ID --tags Key=Name,Value=Lab-NAT
     aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_GW_ID
