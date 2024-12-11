@@ -115,6 +115,14 @@ function phase2() {
     SECRET_ARN=$(aws secretsmanager create-secret --name $SECRET_NAME --description "RDS credentials for LabRDS" \
         --secret-string '{"username":"admin","password":"student12"}' --query 'ARN' --output text)
 
+    # Create DB Subnet Group
+    aws rds create-db-subnet-group --db-subnet-group-name LabDBSubnetGroup --db-subnet-group-description "Lab RDS Subnet Group" \
+    --subnet-ids $DB_SUBNET1 $DB_SUBNET2
+
+
+}
+
+function phase21() {
     # Create RDS Database (use the previously created DB subnet group)
     echo "Creating RDS MySQL instance..."
     RDS_INSTANCE=$(aws rds create-db-instance --db-instance-identifier LabRDS --allocated-storage 20 \
@@ -289,7 +297,7 @@ function phase5() {
         aws ec2 delete-key-pair --key-name $KEY_NAME
         check_command_success "Deleting EC2 Key Pair $KEY_NAME"
     fi
-    
+
     if [ -n "$ASG_KEY_NAME" ]; then
         aws ec2 delete-key-pair --key-name $ASG_KEY_NAME
         check_command_success "Deleting EC2 Key Pair $ASG_KEY_NAME"
@@ -420,6 +428,11 @@ while true; do
     read -p "Continue to Phase 2? (yes/skip): " cont
     if [[ "$cont" == "yes" ]]; then
         phase2
+    fi
+    # Phase 2-1
+    read -p "Continue to Phase 2.1? (yes/skip): " cont
+    if [[ "$cont" == "yes" ]]; then
+        phase21
     fi
     # Phase 3
     read -p "Continue to Phase 3? (yes/skip): " cont
