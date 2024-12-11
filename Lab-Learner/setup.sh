@@ -289,6 +289,7 @@ function phase5() {
         aws ec2 delete-key-pair --key-name $KEY_NAME
         check_command_success "Deleting EC2 Key Pair $KEY_NAME"
     fi
+    
     if [ -n "$ASG_KEY_NAME" ]; then
         aws ec2 delete-key-pair --key-name $ASG_KEY_NAME
         check_command_success "Deleting EC2 Key Pair $ASG_KEY_NAME"
@@ -379,6 +380,8 @@ function phase5() {
 
     if [ -n "$IGW_ID" ]; then
         aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
+
+    fi
 
     # Delete Subnets
     echo "Deleting Subnets..."
