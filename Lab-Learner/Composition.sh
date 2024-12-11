@@ -73,7 +73,7 @@ function phase1() {
 
     # Create EC2 Instance with user data
     USER_DATA_FILE="phase1_userdata.sh"
-    INSTANCE_ID=$(aws ec2 run-instances --image-id ami-0d5d9d301c853a04a --count 1 --instance-type t2.micro --key-name $KEY_NAME \
+    INSTANCE_ID=$(aws ec2 run-instances --image-id ami-0453ec754f44f9a4a --count 1 --instance-type t2.micro --key-name $KEY_NAME \
         --security-group-ids $LAB_SG --subnet-id $PUB_SUBNET1 --user-data file://$USER_DATA_FILE \
         --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Lab-Server-v1}]' --query 'Instances[0].InstanceId' --output text)
     aws ec2 wait instance-running --instance-ids $INSTANCE_ID
@@ -116,9 +116,8 @@ function phase2() {
     aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID
     echo "Original EC2-v1 terminated."
 
-    # Create a new EC2-v2 instance with the updated image (placeholder, assume we have a suitable AMI)
     echo "Creating EC2-v2"
-    NEW_INSTANCE_ID=$(aws ec2 run-instances --image-id ami-08eec49a05b603ba3 --count 1 --instance-type t2.micro --key-name $KEY_NAME \
+    NEW_INSTANCE_ID=$(aws ec2 run-instances --image-id ami-0453ec754f44f9a4a --count 1 --instance-type t2.micro --key-name $KEY_NAME \
     --security-group-ids $LAB_SG --subnet-id $PUB_SUBNET1 \
     --iam-instance-profile Name=LabInstanceProfile \
     --user-data file://phase2_userdata.sh --query 'Instances[0].InstanceId' --output text)
@@ -228,96 +227,158 @@ function phase4() {
 # Phase 5: Cleanup
 function phase5() {
     echo "Starting Phase 5: Cleanup"
-    
+
+    # Function to check if a command succeeds
+    check_command_success() {
+        if [ $? -eq 0 ]; then
+            echo "$1 succeeded."
+        else
+            echo "$1 failed or resource does not exist. Skipping..."
+        fi
+    }
+    # Remove IAM Instance Profile
+    if aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME >/dev/null 2>&1; then
+        aws iam remove-role-from-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME --role-name $ROLE_NAME
+        aws iam delete-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME
+        echo "Instance Profile $INSTANCE_PROFILE_NAME deleted."
+    fi
+
+    # Delete IAM Role
+    if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
+        aws iam delete-role --role-name $ROLE_NAME
+        echo "IAM Role $ROLE_NAME deleted."
+    fi
     # Terminate EC2 instances
     echo "Terminating EC2 instances..."
-    aws ec2 terminate-instances --instance-ids $INSTANCE_ID $NEW_INSTANCE_ID
-    aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID $NEW_INSTANCE_ID
-    echo "EC2 instances terminated."
+    if [ -n "$INSTANCE_ID" ] && [ -n "$NEW_INSTANCE_ID" ]; then
+        aws ec2 terminate-instances --instance-ids $INSTANCE_ID $NEW_INSTANCE_ID
+        aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID $NEW_INSTANCE_ID
+        check_command_success "Terminating EC2 instances"
+    fi
 
     # Delete EC2 Key Pairs
     echo "Deleting EC2 Key Pairs..."
-    aws ec2 delete-key-pair --key-name $KEY_NAME
-    aws ec2 delete-key-pair --key-name $ASG_KEY_NAME
-    echo "EC2 Key Pairs deleted."
+    if [ -n "$KEY_NAME" ]; then
+        aws ec2 delete-key-pair --key-name $KEY_NAME
+        check_command_success "Deleting EC2 Key Pair $KEY_NAME"
+    fi
+    if [ -n "$ASG_KEY_NAME" ]; then
+        aws ec2 delete-key-pair --key-name $ASG_KEY_NAME
+        check_command_success "Deleting EC2 Key Pair $ASG_KEY_NAME"
+    fi
 
     # Delete Launch Template
     echo "Deleting Launch Template..."
-    aws ec2 delete-launch-template --launch-template-name LabServerV3Template
-    echo "Launch Template deleted."
+    if aws ec2 describe-launch-templates --launch-template-names LabServerV3Template > /dev/null 2>&1; then
+        aws ec2 delete-launch-template --launch-template-name LabServerV3Template
+        check_command_success "Deleting Launch Template"
+    fi
+    # Deregister AMI
+    if [ -n "$SERVER_V2_IMAGE_ID" ]; then
+        aws ec2 deregister-image --image-id $SERVER_V2_IMAGE_ID
+        echo "AMI deregistered."
+    fi
+
+    # Delete associated snapshots (if known)
+    if [ -n "$SNAPSHOT_ID" ]; then
+        aws ec2 delete-snapshot --snapshot-id $SNAPSHOT_ID
+        echo "Snapshot deleted."
+    fi
 
     # Delete RDS instance
     echo "Deleting RDS instance..."
-    aws rds delete-db-instance --db-instance-identifier LabRDS --skip-final-snapshot
-    aws rds wait db-instance-deleted --db-instance-identifier LabRDS
-    echo "RDS instance deleted."
+    if aws rds describe-db-instances --db-instance-identifier LabRDS > /dev/null 2>&1; then
+        aws rds delete-db-instance --db-instance-identifier LabRDS --skip-final-snapshot
+        aws rds wait db-instance-deleted --db-instance-identifier LabRDS
+        check_command_success "Deleting RDS instance"
+    fi
 
     # Delete RDS Secret
     echo "Deleting RDS secret..."
-    aws secretsmanager delete-secret --secret-id $SECRET_ARN --force-delete-without-recovery
-    echo "RDS secret deleted."
+    if [ -n "$SECRET_ARN" ]; then
+        aws secretsmanager delete-secret --secret-id $SECRET_ARN --force-delete-without-recovery
+        check_command_success "Deleting RDS secret"
+    fi
 
     # Delete Load Balancer and Target Group
     echo "Deleting Load Balancer..."
-    aws elbv2 delete-load-balancer --load-balancer-arn $LB_ARN
-    echo "Load Balancer deleted."
-    
+    if [ -n "$LB_ARN" ]; then
+        aws elbv2 delete-load-balancer --load-balancer-arn $LB_ARN
+        check_command_success "Deleting Load Balancer"
+    fi
+
     echo "Deleting Target Group..."
-    aws elbv2 delete-target-group --target-group-arn $TG_ARN
-    echo "Target Group deleted."
+    if [ -n "$TG_ARN" ]; then
+        aws elbv2 delete-target-group --target-group-arn $TG_ARN
+        check_command_success "Deleting Target Group"
+    fi
 
     # Delete Auto Scaling Group
     echo "Deleting Auto Scaling Group..."
-    aws autoscaling delete-auto-scaling-group --auto-scaling-group-name $ASG_NAME --force-delete
-    echo "Auto Scaling Group deleted."
+    if [ -n "$ASG_NAME" ]; then
+        aws autoscaling delete-auto-scaling-group --auto-scaling-group-name $ASG_NAME --force-delete
+        check_command_success "Deleting Auto Scaling Group"
+    fi
 
     # Delete Security Groups
     echo "Deleting Security Groups..."
-    aws ec2 delete-security-group --group-id $LAB_SG
-    aws ec2 delete-security-group --group-id $RDS_SG
-    aws ec2 delete-security-group --group-id $LB_SG
-    echo "Security Groups deleted."
+    for sg_id in $LAB_SG $RDS_SG $LB_SG; do
+        if [ -n "$sg_id" ]; then
+            aws ec2 delete-security-group --group-id $sg_id
+            check_command_success "Deleting Security Group $sg_id"
+        fi
+    done
 
     # Delete Subnets
     echo "Deleting Subnets..."
-    aws ec2 delete-subnet --subnet-id $PUB_SUBNET1
-    aws ec2 delete-subnet --subnet-id $PUB_SUBNET2
-    aws ec2 delete-subnet --subnet-id $PRIV_SUBNET1
-    aws ec2 delete-subnet --subnet-id $PRIV_SUBNET2
-    aws ec2 delete-subnet --subnet-id $DB_SUBNET1
-    aws ec2 delete-subnet --subnet-id $DB_SUBNET2
-    echo "Subnets deleted."
+    for subnet_id in $PUB_SUBNET1 $PUB_SUBNET2 $PRIV_SUBNET1 $PRIV_SUBNET2 $DB_SUBNET1 $DB_SUBNET2; do
+        if [ -n "$subnet_id" ]; then
+            aws ec2 delete-subnet --subnet-id $subnet_id
+            check_command_success "Deleting Subnet $subnet_id"
+        fi
+    done
 
     # Delete Route Tables
     echo "Deleting Route Tables..."
-    aws ec2 delete-route-table --route-table-id $PRIV_ROUTE_TABLE
-    echo "Route Table deleted."
+    if [ -n "$PRIV_ROUTE_TABLE" ]; then
+        aws ec2 delete-route-table --route-table-id $PRIV_ROUTE_TABLE
+        check_command_success "Deleting Route Table $PRIV_ROUTE_TABLE"
+    fi
 
     # Delete NAT Gateway and Elastic IP
     echo "Deleting NAT Gateway..."
-    aws ec2 delete-nat-gateway --nat-gateway-id $NAT_GW_ID
-    aws ec2 wait nat-gateway-deleted --nat-gateway-ids $NAT_GW_ID
-    echo "NAT Gateway deleted."
+    if [ -n "$NAT_GW_ID" ]; then
+        aws ec2 delete-nat-gateway --nat-gateway-id $NAT_GW_ID
+        aws ec2 wait nat-gateway-deleted --nat-gateway-ids $NAT_GW_ID
+        check_command_success "Deleting NAT Gateway"
+    fi
 
     echo "Releasing Elastic IP..."
-    aws ec2 release-address --allocation-id $EIP_ALLOC
-    echo "Elastic IP released."
+    if [ -n "$EIP_ALLOC" ]; then
+        aws ec2 release-address --allocation-id $EIP_ALLOC
+        check_command_success "Releasing Elastic IP"
+    fi
 
     # Delete Internet Gateway
     echo "Detaching and deleting Internet Gateway..."
-    aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
-    aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
-    echo "Internet Gateway deleted."
+    if [ -n "$IGW_ID" ] && [ -n "$VPC_ID" ]; then
+        aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
+        aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
+        check_command_success "Deleting Internet Gateway"
+    fi
 
     # Delete VPC
     echo "Deleting VPC..."
-    aws ec2 delete-vpc --vpc-id $VPC_ID
-    echo "VPC deleted."
+    if [ -n "$VPC_ID" ]; then
+        aws ec2 delete-vpc --vpc-id $VPC_ID
+        check_command_success "Deleting VPC"
+    fi
 
-    echo "Phase 5 Complete: All resources deleted."
+    echo "Phase 5 Complete: All resources checked and deleted as necessary."
 }
 
 ## Execute Phases with Confirmation
+
 phase1
 read -p "Continue to Phase 2? (yes/no): " cont
 if [ "$cont" == "yes" ]; then
@@ -330,19 +391,32 @@ if [ "$cont" == "yes" ]; then
             if [ "$cont" == "yes" ]; then
                 phase4
             else
-                echo "Delete Resources and Exit? (yes/no)"
-                break
+                echo "Would you like to proceed to Phase 5 (cleanup)? (yes/no): "
+                read cont
                 if [ "$cont" == "yes" ]; then
                     phase5
+                    break
                 else
-                    echo "Exiting, All created resources still active..."
+                    echo "Exiting. All created resources still active..."
                     break
                 fi
             fi
         done
     else
-        echo "Deployment stopped after Phase 2"
+        echo "Would you like to proceed to Phase 5 (cleanup)? (yes/no): "
+        read cont
+        if [ "$cont" == "yes" ]; then
+            phase5
+        else
+            echo "Exiting. All created resources still active..."
+        fi
     fi
 else
-    echo "Deployment stopped after Phase 1"
+    echo "Would you like to proceed to Phase 5 (cleanup)? (yes/no): "
+    read cont
+    if [ "$cont" == "yes" ]; then
+        phase5
+    else
+        echo "Exiting. All created resources still active..."
+    fi
 fi
