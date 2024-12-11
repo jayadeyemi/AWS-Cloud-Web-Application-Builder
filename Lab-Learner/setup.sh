@@ -94,7 +94,7 @@ function phase1() {
     INSTANCE_ID=$(aws ec2 run-instances --image-id ami-0453ec754f44f9a4a --count 1 --instance-type t2.micro --key-name $KEY_NAME \
         --security-group-ids $LAB_SG --subnet-id $PUB_SUBNET1 --user-data file://$USER_DATA_FILE \
         --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Lab-Server-v1}]' --query 'Instances[0].InstanceId' --output text)
-    aws ec2 wait instance-running --instance-ids $INSTANCE_ID
+    aws ec2 wait instance-status-ok --instance-ids $INSTANCE_ID
     INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
     echo "Lab-Server-v1 Public IP: $INSTANCE_PUBLIC_IP"
 }
@@ -118,8 +118,7 @@ function phase2() {
     # Create DB Subnet Group
     aws rds create-db-subnet-group --db-subnet-group-name LabDBSubnetGroup --db-subnet-group-description "Lab RDS Subnet Group" \
     --subnet-ids $DB_SUBNET1 $DB_SUBNET2
-
-
+    aws rds wait db-subnet-group-available --db-subnet-group-name LabDBSubnetGroup
 }
 
 function phase21() {
@@ -134,7 +133,7 @@ function phase21() {
     RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier $RDS_INSTANCE --query 'DBInstances[0].Endpoint.Address' --output text)
     
     echo "Migrating data to RDS..."
-    mysqldump -h $INSTANCE_PUBLIC_IP -u nodeapp -p --databases STUDENTS > data.sql
+    mysqldump -h $INSTANCE_PUBLIC_IP -u nodeapp -pstudent12 --databases STUDENTS > data.sql
     mysql -h $RDS_ENDPOINT -u admin -pstudent12 STUDENTS < data.sql
 
     echo "Terminating original EC2-v1"
@@ -147,7 +146,7 @@ function phase21() {
     --security-group-ids $LAB_SG --subnet-id $PUB_SUBNET1 \
     --iam-instance-profile Name=LabInstanceProfile \
     --user-data file://phase2_userdata.sh --query 'Instances[0].InstanceId' --output text)
-    aws ec2 wait instance-running --instance-ids $NEW_INSTANCE_ID
+    aws ec2 wait instance-status-ok --instance-ids $NEW_INSTANCE_ID
     NEW_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $NEW_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
     echo "New EC2 instance (EC2-v2) launched with Public IP: $NEW_INSTANCE_PUBLIC_IP"
 
@@ -187,7 +186,7 @@ function phase3() {
     --user-data file://phase2_userdata.sh --query 'Instances[0].InstanceId' --output text)
 
     echo "Waiting for new EC2 instance (EC2-v3) to be ready..."
-    aws ec2 wait instance-running --instance-ids $NEW_INSTANCE_ID
+    aws ec2 wait instance-status-ok --instance-ids $NEW_INSTANCE_ID
     NEW_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $NEW_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
     echo "New EC2 instance (EC2-v3) launched with Public IP: $NEW_INSTANCE_PUBLIC_IP"
     
