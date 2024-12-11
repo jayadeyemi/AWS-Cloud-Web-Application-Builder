@@ -24,10 +24,13 @@ function phase1() {
     aws ec2 wait vpc-available --vpc-ids $VPC_ID
 
     # Create Subnets with tagging
+   # Create first public subnet and enable auto-assign public IP
     PUB_SUBNET1=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.1.0/24 --availability-zone us-east-1a --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PUB_SUBNET1 --tags Key=Name,Value=Lab-PublicSubnet1
+    aws ec2 modify-subnet-attribute --subnet-id $PUB_SUBNET1 --map-public-ip-on-launch
     PUB_SUBNET2=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.2.0/24 --availability-zone us-east-1b --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PUB_SUBNET2 --tags Key=Name,Value=Lab-PublicSubnet2
+    aws ec2 modify-subnet-attribute --subnet-id $PUB_SUBNET2 --map-public-ip-on-launch
     PRIV_SUBNET1=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.3.0/24 --availability-zone us-east-1a --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PRIV_SUBNET1 --tags Key=Name,Value=Lab-PrivateSubnet1
     PRIV_SUBNET2=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.4.0/24 --availability-zone us-east-1b --query 'Subnet.SubnetId' --output text)
