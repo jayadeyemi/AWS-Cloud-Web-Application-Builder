@@ -19,117 +19,11 @@ PRIVATE_SUBNET_TAG="Private Subnet*"
 PUBLIC_SUBNET_TAG="Public Subnet*"
 RDS_SUBNET_GROUP="Example-DB-subnet-group"
 
-# Function to check for required variables
-check_variable() {
-    if [ -z "${!1}" ]; then
-        echo "Error: Variable $1 is not set. Please set it before running the script."
-        exit 1
-    fi
-}
-
-# Function to check if a required AWS resource exists
-check_aws_resource() {
-    local resource_type=$1
-    local resource_name=$2
-    local filter=$3
-    local query=$4
-
-    result=$(aws "$resource_type" "$filter" "$resource_name" --query "$query" --output text --region "$REGION" 2>/dev/null)
-    if [[ $? -ne 0 || $result == "None" ]]; then
-        echo "Error: $resource_type $resource_name not found."
-        exit 1
-    fi
-    echo "$resource_type $resource_name is configured."
-}
-
-echo "Checking prerequisites for deployment..."
-
-# Check if required variables are set
-required_variables=("REGION" "RDS_IDENTIFIER" "DB_USERNAME" "DB_PASSWORD" "SECRET_NAME" 
-                    "LAUNCH_TEMPLATE_NAME" "ASG_NAME" "TARGET_GROUP_NAME" "LOAD_BALANCER_NAME" 
-                    "EC2_IAM_ROLE" "ALB_SECURITY_GROUP" "DB_SECURITY_GROUP" "APP_SECURITY_GROUP" 
-                    "PRIVATE_SUBNET_TAG" "PUBLIC_SUBNET_TAG" "RDS_SUBNET_GROUP")
-for var in "${required_variables[@]}"; do
-    check_variable "$var"
-done
-
-# Check for AWS CLI
-if ! command -v aws &>/dev/null; then
-    echo "Error: AWS CLI is not installed or not in PATH."
-    exit 1
-fi
-
-# Check for jq
-if ! command -v jq &>/dev/null; then
-    echo "Error: jq is not installed or not in PATH."
-    exit 1
-fi
-
-# Check for MySQL client
-if ! command -v mysql &>/dev/null; then
-    echo "Error: MySQL client is not installed or not in PATH."
-    exit 1
-fi
-
-# Check RDS Subnet Group
-check_aws_resource "rds describe-db-subnet-groups" "--db-subnet-group-name" "$RDS_SUBNET_GROUP" "DBSubnetGroups[0].DBSubnetGroupName"
-
-# Check IAM Role
-check_aws_resource "iam get-role" "--role-name" "$EC2_IAM_ROLE" "Role.RoleName"
-
-# Check ALB Security Group
-check_aws_resource "ec2 describe-security-groups" "--filters Name=group-name,Values=$ALB_SECURITY_GROUP" "SecurityGroups[0].GroupId"
-
-# Check Database Security Group
-check_aws_resource "ec2 describe-security-groups" "--filters Name=group-name,Values=$DB_SECURITY_GROUP" "SecurityGroups[0].GroupId"
-
-# Check Application Security Group
-check_aws_resource "ec2 describe-security-groups" "--filters Name=group-name,Values=$APP_SECURITY_GROUP" "SecurityGroups[0].GroupId"
-
-# Check Private Subnets
-private_subnets=$(aws ec2 describe-subnets --filters "Name=tag:Name,Values=$PRIVATE_SUBNET_TAG" --query 'Subnets[*].[SubnetId, AvailabilityZone]' --output text --region "$REGION")
-if [[ -z $private_subnets ]]; then
-    echo "Error: No private subnets found with tag $PRIVATE_SUBNET_TAG."
-    exit 1
-fi
-echo "Private subnets found:"
-echo "$private_subnets"
-
-# Check Public Subnets
-public_subnets=$(aws ec2 describe-subnets --filters "Name=tag:Name,Values=$PUBLIC_SUBNET_TAG" --query 'Subnets[*].[SubnetId, AvailabilityZone]' --output text --region "$REGION")
-if [[ -z $public_subnets ]]; then
-    echo "Error: No public subnets found with tag $PUBLIC_SUBNET_TAG."
-    exit 1
-fi
-echo "Public subnets found:"
-echo "$public_subnets"
-
-# Check for existing RDS instance
-rds_instance=$(aws rds describe-db-instances --db-instance-identifier "$RDS_IDENTIFIER" --query "DBInstances[0].DBInstanceIdentifier" --output text --region "$REGION" 2>/dev/null)
-if [[ $? -eq 0 && $rds_instance == "$RDS_IDENTIFIER" ]]; then
-    echo "RDS instance $RDS_IDENTIFIER exists."
-else
-    echo "RDS instance $RDS_IDENTIFIER does not exist. It will be created during deployment."
-fi
-
-echo "All prerequisites checked successfully."
-
-read -p "Enter your public IP address (x.x.x.x): " ADMIN_IP # Prompt for Admin's Public IP Address
-ADMIN_IP="$ADMIN_IP/32" # Append /32 to specify a single IP address
 
 echo "Starting resource execution..."
 
 # Step 1: Configure Security Group Rules
 echo "Updating security group rules..."
-
-# Allow ALB to communicate with EC2 instances
-aws ec2 authorize-security-group-ingress \
-    --group-name Inventory-App \
-    --protocol tcp \
-    --port 80 \
-    --source-group $(aws ec2 describe-security-groups --filters Name=group-name,Values=ALBSG --query 'SecurityGroups[0].GroupId' --output text) \
-    --region $REGION
-check_status "Failed to allow ALB to communicate with EC2."
 
 # Allow EC2 to communicate with RDS
 aws ec2 authorize-security-group-egress \
@@ -211,7 +105,7 @@ aws elbv2 create-listener \
     --default-actions Type=forward,TargetGroupArn=$TG_ARN \
     --region $REGION
 check_status "Listener creation failed."
-
+#wait
 # Step 5: Configure Auto Scaling Group
 echo "Creating Auto Scaling Group..."
 aws autoscaling create-auto-scaling-group \
@@ -241,3 +135,24 @@ ALB_DNS=$(aws elbv2 describe-load-balancers --load-balancer-arns $ALB_ARN --quer
 check_status "Failed to retrieve ALB DNS name."
 
 echo "Application deployed successfully. Access it at: http://$ALB_DNS"
+
+
+
+# OPEN ONE OF THE DEPLOYED ec2 INSTANCES
+#Step 1: log in to the EC2 instance as the ec2-user and download the SQL file
+# Edit the <rds-endpoint> with the actual RDS endpoint
+bash
+sudo su
+su ec2-user
+whoami
+cd /home/ec2-user/
+wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACACAD-3-113230/22-lab-Capstone-project/s3/Countrydatadump.sql
+mysql -u admin -p --host <rds-endpoint>
+# Enter the password
+
+
+#Step 2: Create the database and import the data
+create database countries;
+end;
+
+mysql -u admin -p --host <rds-endpoint> < Countrydatadump.sql
