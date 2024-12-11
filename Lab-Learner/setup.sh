@@ -266,12 +266,21 @@ function phase5() {
         aws iam delete-role --role-name $ROLE_NAME
         echo "IAM Role $ROLE_NAME deleted."
     fi
-    # Terminate EC2 instances
-    echo "Terminating EC2 instances..."
-    if [ -n "$INSTANCE_ID" ] && [ -n "$NEW_INSTANCE_ID" ]; then
-        aws ec2 terminate-instances --instance-ids $INSTANCE_ID $NEW_INSTANCE_ID
-        aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID $NEW_INSTANCE_ID
-        check_command_success "Terminating EC2 instances"
+
+    # Terminate the first EC2 instance
+    echo "Terminating EC2 instance: $INSTANCE_ID"
+    if [ -n "$INSTANCE_ID" ]; then
+        aws ec2 terminate-instances --instance-ids $INSTANCE_ID
+        aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID
+        check_command_success "Terminating EC2 instance $INSTANCE_ID"
+    fi
+
+    # Terminate the second EC2 instance
+    echo "Terminating EC2 instance: $NEW_INSTANCE_ID"
+    if [ -n "$NEW_INSTANCE_ID" ]; then
+        aws ec2 terminate-instances --instance-ids $NEW_INSTANCE_ID
+        aws ec2 wait instance-terminated --instance-ids $NEW_INSTANCE_ID
+        check_command_success "Terminating EC2 instance $NEW_INSTANCE_ID"
     fi
 
     # Delete EC2 Key Pairs
@@ -347,22 +356,6 @@ function phase5() {
         fi
     done
 
-    # Delete Subnets
-    echo "Deleting Subnets..."
-    for subnet_id in $PUB_SUBNET1 $PUB_SUBNET2 $PRIV_SUBNET1 $PRIV_SUBNET2 $DB_SUBNET1 $DB_SUBNET2; do
-        if [ -n "$subnet_id" ]; then
-            aws ec2 delete-subnet --subnet-id $subnet_id
-            check_command_success "Deleting Subnet $subnet_id"
-        fi
-    done
-
-    # Delete Route Tables
-    echo "Deleting Route Tables..."
-    if [ -n "$PRIV_ROUTE_TABLE" ]; then
-        aws ec2 delete-route-table --route-table-id $PRIV_ROUTE_TABLE
-        check_command_success "Deleting Route Table $PRIV_ROUTE_TABLE"
-    fi
-
     # Delete NAT Gateway and Elastic IP
     echo "Deleting NAT Gateway..."
     if [ -n "$NAT_GW_ID" ]; then
@@ -377,12 +370,30 @@ function phase5() {
         check_command_success "Releasing Elastic IP"
     fi
 
-    # Delete Internet Gateway
     echo "Detaching and deleting Internet Gateway..."
     if [ -n "$IGW_ID" ] && [ -n "$VPC_ID" ]; then
         aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
         aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
         check_command_success "Deleting Internet Gateway"
+    fi
+
+    if [ -n "$IGW_ID" ]; then
+        aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
+
+    # Delete Subnets
+    echo "Deleting Subnets..."
+    for subnet_id in $PUB_SUBNET1 $PUB_SUBNET2 $PRIV_SUBNET1 $PRIV_SUBNET2 $DB_SUBNET1 $DB_SUBNET2; do
+        if [ -n "$subnet_id" ]; then
+            aws ec2 delete-subnet --subnet-id $subnet_id
+            check_command_success "Deleting Subnet $subnet_id"
+        fi
+    done
+
+    # Delete Route Tables
+    echo "Deleting Route Tables..."
+    if [ -n "$PRIV_ROUTE_TABLE" ]; then
+        aws ec2 delete-route-table --route-table-id $PRIV_ROUTE_TABLE
+        check_command_success "Deleting Route Table $PRIV_ROUTE_TABLE"
     fi
 
     # Delete VPC
