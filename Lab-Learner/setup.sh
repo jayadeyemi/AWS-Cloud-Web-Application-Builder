@@ -46,7 +46,6 @@ function phase1() {
     echo "Creating Main Route Table"
     # Main route table for Private subnets
     MAIN_ROUTE_TABLE_ID=$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$VPC_ID" "Name=association.main,Values=true" --query "RouteTables[0].RouteTableId" --output text)
-    aws wait route-table-available --route-table-ids $MAIN_ROUTE_TABLE_ID
     aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1
     aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2
 
@@ -54,7 +53,6 @@ function phase1() {
     # Public route table
     PUB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
     aws ec2 create-tags --resources $PUB_ROUTE_TABLE --tags Key=Name,Value=Lab-PublicRouteTable
-    aws ec2 wait route-table-available --route-table-ids $PUB_ROUTE_TABLE
     aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET1
     aws ec2 associate-route-table --route-table-id $PUB_ROUTE_TABLE --subnet-id $PUB_SUBNET2
 
@@ -62,16 +60,17 @@ function phase1() {
     # DB route table
     DB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
     aws ec2 create-tags --resources $DB_ROUTE_TABLE --tags Key=Name,Value=Lab-DBRouteTable
-    aws ec2 wait route-table-available --route-table-ids $DB_ROUTE_TABLE
     aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1
     aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2
     
+    echo "Creating Internet Gateway"
     # Create and attach IGW
     IGW_ID=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)
     aws ec2 create-tags --resources $IGW_ID --tags Key=Name,Value=Lab-IGW
     aws ec2 attach-internet-gateway --vpc-id $VPC_ID --internet-gateway-id $IGW_ID
     aws ec2 create-route --route-table-id $PUB_ROUTE_TABLE --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID
 
+    echo "Creating NAT Gateway"
     # Create NAT Gateway and route table configuration
     EIP_ALLOC=$(aws ec2 allocate-address --query 'AllocationId' --output text)
     NAT_GW_ID=$(aws ec2 create-nat-gateway --subnet-id $PUB_SUBNET1 --allocation-id $EIP_ALLOC --query 'NatGateway.NatGatewayId' --output text)
@@ -79,6 +78,7 @@ function phase1() {
     aws ec2 wait nat-gateway-available --nat-gateway-ids $NAT_GW_ID
     aws ec2 create-route --route-table-id $MAIN_ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --nat-gateway-id $NAT_GW_ID
 
+    echo "Creating Security Groups"
     # Create Security Group
     LAB_SG=$(aws ec2 create-security-group --group-name Lab-Server-SG --description "Lab Server Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
@@ -119,11 +119,13 @@ function phase2() {
     # Modify Lab-Server-SG to allow RDS access and remove HTTP access
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 3306 --source-group $RDS_SG
 
+    echo "Creating secret in Secrets Manager"
     # Create a secret in Secrets Manager
     SECRET_NAME="LabRDSSecret"
     SECRET_ARN=$(aws secretsmanager create-secret --name $SECRET_NAME --description "RDS credentials for LabRDS" \
         --secret-string '{"username":"admin","password":"student12"}' --query 'ARN' --output text)
 
+    echo "Creating RDS Subnet Group"
     # Create DB Subnet Group
     aws rds create-db-subnet-group --db-subnet-group-name LabDBSubnetGroup --db-subnet-group-description "Lab RDS Subnet Group" \
     --subnet-ids $DB_SUBNET1 $DB_SUBNET2
@@ -199,20 +201,24 @@ function phase3() {
     NEW_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $NEW_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
     echo "New EC2 instance (EC2-v3) launched with Public IP: $NEW_INSTANCE_PUBLIC_IP"
     
+    echo "Creating RDS Security Group"
     # Create Load Balancer Security Group
     LB_SG=$(aws ec2 create-security-group --group-name Lab-LB-SG --description "Load Balancer Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
     aws ec2 authorize-security-group-ingress --group-id $LB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
 
+    echo "Modifying Lab-Server-SG for private subnet usage"
     # Modify Lab-Server-SG for private subnet usage
     aws ec2 revoke-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --source-group $LB_SG
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 443 --source-group $LB_SG
 
+    echo "Creating Load Balancer"
     # Create Load Balancer
     LB_ARN=$(aws elbv2 create-load-balancer --name Lab-Server-LB --subnets $PUB_SUBNET1 $PUB_SUBNET2 --security-groups $LB_SG \
     --tags Key=Name,Value=Lab-Server-LB --query 'LoadBalancers[0].LoadBalancerArn' --output text)
     aws elbv2 wait load-balancer-available --load-balancer-arns $LB_ARN
 
+    echo "Creating Listener"
     # Create Target Group
     TG_ARN=$(aws elbv2 create-target-group --name Lab-Server-TG --protocol HTTP --port 80 --vpc-id $VPC_ID \
         --tags Key=Name,Value=Lab-Server-TG --query 'TargetGroups[0].TargetGroupArn' --output text)
@@ -220,6 +226,7 @@ function phase3() {
     # Register Targets
     aws elbv2 register-targets --target-group-arn $TG_ARN --targets Id=$INSTANCE_ID
 
+    echo "Creating Auto Scaling Group"
     # Create Auto Scaling Group (using Launch Template)
     ASG_NAME="Lab-ASG"
     aws autoscaling create-auto-scaling-group --auto-scaling-group-name $ASG_NAME \
@@ -428,33 +435,44 @@ function phase5() {
 # Execute Phases with Confirmation
 while true; do
     # Phase 1
-    read -p "Start Phase 1? (yes/skip): " cont
+    read -t 120 -p "Start Phase 1? (yes/skip): " cont
+    cont="${cont:-yes}"  # Default to "yes" if no input is provided after timeout
     if [[ "$cont" == "yes" ]]; then
         phase1
     fi
+
     # Phase 2
-    read -p "Continue to Phase 2? (yes/skip): " cont
+    read -t 120 -p "Continue to Phase 2? (yes/skip): " cont
+    cont="${cont:-yes}"
     if [[ "$cont" == "yes" ]]; then
         phase2
     fi
-    # Phase 2-1
-    read -p "Continue to Phase 2.1? (yes/skip): " cont
+
+    # Phase 2.1
+    read -t 120 -p "Continue to Phase 2.1? (yes/skip): " cont
+    cont="${cont:-yes}"
     if [[ "$cont" == "yes" ]]; then
         phase21
     fi
+
     # Phase 3
-    read -p "Continue to Phase 3? (yes/skip): " cont
+    read -t 120 -p "Continue to Phase 3? (yes/skip): " cont
+    cont="${cont:-yes}"
     if [[ "$cont" == "yes" ]]; then
         phase3
-    fi  
+    fi
+
     # Phase 4
-    read -p "Continue to Phase 4? (yes/skip): " cont
+    read -t 120 -p "Continue to Phase 4? (yes/skip): " cont
+    cont="${cont:-yes}"
     if [[ "$cont" == "yes" ]]; then
         phase4
-    fi   
+    fi
+
     # Phase 5 (Cleanup) with nested loop
     while true; do
-        read -p "Proceed to Phase 5 (cleanup)? (yes/exit): " cont
+        read -t 120 -p "Proceed to Phase 5 (cleanup)? (yes/exit): " cont
+        cont="${cont:-yes}"
         if [[ "$cont" == "yes" ]]; then
             phase5
         else
@@ -462,6 +480,7 @@ while true; do
             exit 0
         fi
     done
+
     echo "All phases processed. Exiting now..."
     break
 done
