@@ -2,8 +2,12 @@
 
 # Get user's IP for SSH access
 read -p "Enter your current IP address (e.g., 203.0.113.25): " USER_IP
-read -p "Enter your Cloud9 IP address (e.g., 203.0.113.30): " CLOUD9_IP 
+read -p "Enter your Cloud9 IP address (e.g., 203.0.113.30): " CLOUD9_IP
 
+# Define missing variables
+SNAPSHOT_ID=""
+DBSubnetGroup="LabDBSubnetGroup"
+PRIV_ROUTE_TABLE=""
 
 # Phase 1: VPC, Subnets, and EC2 with MySQL
 function phase1() {
@@ -25,8 +29,7 @@ function phase1() {
     aws ec2 wait vpc-available --vpc-ids $VPC_ID
 
     # Create Subnets with tagging
-   # Create first public subnet and enable auto-assign public IP
-   echo "Creating Subnets"
+    echo "Creating Subnets"
     PUB_SUBNET1=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.1.0/24 --availability-zone us-east-1a --query 'Subnet.SubnetId' --output text)
     aws ec2 create-tags --resources $PUB_SUBNET1 --tags Key=Name,Value=Lab-PublicSubnet1
     PUB_SUBNET2=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 192.168.2.0/24 --availability-zone us-east-1b --query 'Subnet.SubnetId' --output text)
@@ -49,6 +52,9 @@ function phase1() {
     aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET1
     aws ec2 associate-route-table --route-table-id $MAIN_ROUTE_TABLE_ID --subnet-id $PRIV_SUBNET2
 
+    # Assigning PRIV_ROUTE_TABLE to MAIN_ROUTE_TABLE_ID to avoid undefined variable usage later
+    PRIV_ROUTE_TABLE=$MAIN_ROUTE_TABLE_ID
+
     echo "Creating Public Route Table"
     # Public route table
     PUB_ROUTE_TABLE=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text)
@@ -62,7 +68,7 @@ function phase1() {
     aws ec2 create-tags --resources $DB_ROUTE_TABLE --tags Key=Name,Value=Lab-DBRouteTable
     aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET1
     aws ec2 associate-route-table --route-table-id $DB_ROUTE_TABLE --subnet-id $DB_SUBNET2
-    
+
     echo "Creating Internet Gateway"
     # Create and attach IGW
     IGW_ID=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)
@@ -84,8 +90,8 @@ function phase1() {
     LAB_SG=$(aws ec2 create-security-group --group-name Lab-Server-SG --description "Lab Server Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $USER_IP/32
-    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $CLOUD9_IP/32 
-    
+    aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 22 --cidr $CLOUD9_IP/32
+
     # Enable Session Manager for EC2 instances
     INSTANCE_PROFILE_NAME="LabInstanceProfile"
     ROLE_NAME="AmazonSSMRoleForInstancesQuickSetup"
@@ -96,10 +102,8 @@ function phase1() {
     else
         echo "Instance profile $INSTANCE_PROFILE_NAME already exists."
     fi
-    
-    echo "Creating EC2-v1"
 
-    # Create EC2 Instance with user data
+    echo "Creating EC2-v1"
     USER_DATA_FILE="phase1_userdata.sh"
     INSTANCE_ID=$(aws ec2 run-instances --image-id ami-0453ec754f44f9a4a --count 1 --instance-type t2.micro --key-name $KEY_NAME \
         --security-group-ids $LAB_SG --subnet-id $PUB_SUBNET1 --user-data file://$USER_DATA_FILE \
@@ -122,15 +126,15 @@ function phase2() {
 
     echo "Creating secret in Secrets Manager"
     # Create a secret in Secrets Manager
-    SECRET_NAME="LabRDSSecret"
+    SECRET_NAME="Lab-ProjectSecret"
     SECRET_ARN=$(aws secretsmanager create-secret --name $SECRET_NAME --description "RDS credentials for LabRDS" \
         --secret-string '{"username":"admin","password":"student12"}' --query 'ARN' --output text)
 
     echo "Creating RDS Subnet Group"
     # Create DB Subnet Group
-    aws rds create-db-subnet-group --db-subnet-group-name LabDBSubnetGroup --db-subnet-group-description "Lab RDS Subnet Group" \
+    aws rds create-db-subnet-group --db-subnet-group-name $DBSubnetGroup --db-subnet-group-description "Lab RDS Subnet Group" \
     --subnet-ids $DB_SUBNET1 $DB_SUBNET2
-    aws rds wait db-subnet-group-available --db-subnet-group-name LabDBSubnetGroup
+    aws rds wait db-subnet-group-available --db-subnet-group-name $DBSubnetGroup
 }
 
 function phase21() {
@@ -138,12 +142,12 @@ function phase21() {
     echo "Creating RDS MySQL instance..."
     RDS_INSTANCE=$(aws rds create-db-instance --db-instance-identifier LabRDS --allocated-storage 20 \
     --db-instance-class db.t2.micro --engine mysql --master-username admin --master-user-password student12 \
-    --vpc-security-group-ids $RDS_SG --db-subnet-group-name LabDBSubnetGroup \
+    --vpc-security-group-ids $RDS_SG --db-subnet-group-name $DBSubnetGroup \
     --availability-zone us-east-1b --backup-retention-period 1 --no-enable-performance-insights \
     --tags Key=Name,Value=LabRDS --query 'DBInstance.DBInstanceIdentifier' --output text)
     aws rds wait db-instance-available --db-instance-identifier $RDS_INSTANCE
     RDS_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier $RDS_INSTANCE --query 'DBInstances[0].Endpoint.Address' --output text)
-    
+
     echo "Migrating data to RDS..."
     mysqldump -h $INSTANCE_PUBLIC_IP -u nodeapp -pstudent12 --databases STUDENTS > data.sql
     mysql -h $RDS_ENDPOINT -u admin -pstudent12 STUDENTS < data.sql
@@ -168,12 +172,16 @@ function phase21() {
     echo "Image created with ID: $SERVER_V2_IMAGE_ID"
 
     echo "Phase 2 Complete: RDS Endpoint - $RDS_ENDPOINT"
+
+    # Reassign INSTANCE_ID to NEW_INSTANCE_ID so future phases reference a valid instance
+    INSTANCE_ID=$NEW_INSTANCE_ID
 }
 
 # Phase 3: Load Balancer and Auto Scaling
 function phase3() {
     echo "Starting Phase 3: Setting up Load Balancer and Auto Scaling"
     echo "Creating a Launch Template for Ec2-v3 instance..."
+
     aws ec2 create-launch-template --launch-template-name LabServerV3Template \
     --launch-template-data "{
         \"ImageId\": \"$SERVER_V2_IMAGE_ID\",
@@ -189,9 +197,12 @@ function phase3() {
             }
         ]
     }"
-    aws ec2 wait launch-template-available --launch-template-name LabServerV3Template
+
+    # Remove problematic waiter (no such waiter exists for launch templates)
+    # aws ec2 wait launch-template-available --launch-template-name LabServerV3Template
 
     echo "Launching new EC2-v3 from template..."
+    # Reusing the same user data from phase2 here as in the original script
     NEW_INSTANCE_ID=$(aws ec2 run-instances --image-id $SERVER_V2_IMAGE_ID --count 1 --instance-type t2.micro --key-name $KEY_NAME \
     --security-group-ids $LAB_SG --subnet-id $PUB_SUBNET1 \
     --iam-instance-profile Name=LabInstanceProfile \
@@ -201,34 +212,32 @@ function phase3() {
     aws ec2 wait instance-status-ok --instance-ids $NEW_INSTANCE_ID
     NEW_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $NEW_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
     echo "New EC2 instance (EC2-v3) launched with Public IP: $NEW_INSTANCE_PUBLIC_IP"
-    
+
     echo "Creating RDS Security Group"
-    # Create Load Balancer Security Group
-    LB_SG=$(aws ec2 create-security-group --group-name Lab-LB-SG --description "Load Balancer Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
-    aws ec2 authorize-security-group-ingress --group-id $LB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
+    # Already created in previous phases, just echoing
+    echo "RDS_SG: $RDS_SG"
 
     echo "Modifying Lab-Server-SG for private subnet usage"
     # Modify Lab-Server-SG for private subnet usage
-    aws ec2 revoke-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
+    aws ec2 revoke-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0 || true
+    LB_SG=$(aws ec2 create-security-group --group-name Lab-LB-SG --description "Load Balancer Security Group" --vpc-id $VPC_ID --query 'GroupId' --output text)
+    aws ec2 authorize-security-group-ingress --group-id $LB_SG --protocol tcp --port 80 --cidr 0.0.0.0/0
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 80 --source-group $LB_SG
     aws ec2 authorize-security-group-ingress --group-id $LAB_SG --protocol tcp --port 443 --source-group $LB_SG
 
     echo "Creating Load Balancer"
-    # Create Load Balancer
     LB_ARN=$(aws elbv2 create-load-balancer --name Lab-Server-LB --subnets $PUB_SUBNET1 $PUB_SUBNET2 --security-groups $LB_SG \
     --tags Key=Name,Value=Lab-Server-LB --query 'LoadBalancers[0].LoadBalancerArn' --output text)
     aws elbv2 wait load-balancer-available --load-balancer-arns $LB_ARN
 
     echo "Creating Listener"
-    # Create Target Group
     TG_ARN=$(aws elbv2 create-target-group --name Lab-Server-TG --protocol HTTP --port 80 --vpc-id $VPC_ID \
         --tags Key=Name,Value=Lab-Server-TG --query 'TargetGroups[0].TargetGroupArn' --output text)
 
-    # Register Targets
+    # Register Targets (registering INSTANCE_ID which now refers to EC2-v2 or EC2-v3 as needed)
     aws elbv2 register-targets --target-group-arn $TG_ARN --targets Id=$INSTANCE_ID
 
     echo "Creating Auto Scaling Group"
-    # Create Auto Scaling Group (using Launch Template)
     ASG_NAME="Lab-ASG"
     aws autoscaling create-auto-scaling-group --auto-scaling-group-name $ASG_NAME \
     --min-size 2 --max-size 6 --desired-capacity 2 \
@@ -256,13 +265,12 @@ function phase3() {
 
 # Phase 4: Load Testing
 function phase4() {
-
     echo "Starting Phase 4: Load Testing"
-    npm install -g loadtest
+    npm install -g loadtest || true
 
     echo "Running loadtest on the application"
     ELB_URL=$(aws elbv2 describe-load-balancers --names Lab-Server-LB --query 'LoadBalancers[0].DNSName' --output text)
-    loadtest --rps 1000 -c 500 -k $ELB_URL
+    loadtest --rps 1000 -c 500 -k $ELB_URL || true
     echo "Load Testing executed"
 }
 
@@ -278,32 +286,37 @@ function phase5() {
             echo "$1 failed or resource does not exist. Skipping..."
         fi
     }
-    # Remove IAM Instance Profile
+
+    # Scale down ASG before deletion
+    if [ -n "$ASG_NAME" ]; then
+        aws autoscaling update-auto-scaling-group --auto-scaling-group-name $ASG_NAME --min-size 0 --desired-capacity 0 || true
+        sleep 60
+    fi
+
+    # Remove IAM Instance Profile and Role if they exist
     if aws iam get-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME >/dev/null 2>&1; then
         aws iam remove-role-from-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME --role-name $ROLE_NAME
         aws iam delete-instance-profile --instance-profile-name $INSTANCE_PROFILE_NAME
         echo "Instance Profile $INSTANCE_PROFILE_NAME deleted."
     fi
 
-    # Delete IAM Role
     if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
         aws iam delete-role --role-name $ROLE_NAME
         echo "IAM Role $ROLE_NAME deleted."
     fi
 
-    # Terminate the first EC2 instance
-    echo "Terminating EC2 instance: $INSTANCE_ID"
+    # Terminate EC2 instances
     if [ -n "$INSTANCE_ID" ]; then
-        aws ec2 terminate-instances --instance-ids $INSTANCE_ID
-        aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID
+        echo "Terminating EC2 instance: $INSTANCE_ID"
+        aws ec2 terminate-instances --instance-ids $INSTANCE_ID || true
+        aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID || true
         check_command_success "Terminating EC2 instance $INSTANCE_ID"
     fi
 
-    # Terminate the second EC2 instance
-    echo "Terminating EC2 instance: $NEW_INSTANCE_ID"
     if [ -n "$NEW_INSTANCE_ID" ]; then
-        aws ec2 terminate-instances --instance-ids $NEW_INSTANCE_ID
-        aws ec2 wait instance-terminated --instance-ids $NEW_INSTANCE_ID
+        echo "Terminating EC2 instance: $NEW_INSTANCE_ID"
+        aws ec2 terminate-instances --instance-ids $NEW_INSTANCE_ID || true
+        aws ec2 wait instance-terminated --instance-ids $NEW_INSTANCE_ID || true
         check_command_success "Terminating EC2 instance $NEW_INSTANCE_ID"
     fi
 
@@ -325,14 +338,15 @@ function phase5() {
         aws ec2 delete-launch-template --launch-template-name LabServerV3Template
         check_command_success "Deleting Launch Template"
     fi
+
     # Deregister AMI
     if [ -n "$SERVER_V2_IMAGE_ID" ]; then
         aws ec2 deregister-image --image-id $SERVER_V2_IMAGE_ID
         echo "AMI deregistered."
     fi
 
-    # Delete associated snapshots (if known)
-    if [ -n "$SNAPSHOT_ID" ]; then
+    # Delete associated snapshots if any (not defined in this script)
+    if [ -n "$SNAPSHOT_ID" ] && [ "$SNAPSHOT_ID" != "" ]; then
         aws ec2 delete-snapshot --snapshot-id $SNAPSHOT_ID
         echo "Snapshot deleted."
     fi
@@ -357,6 +371,8 @@ function phase5() {
     if [ -n "$LB_ARN" ]; then
         aws elbv2 delete-load-balancer --load-balancer-arn $LB_ARN
         check_command_success "Deleting Load Balancer"
+        # Wait for LB deletion
+        sleep 30
     fi
 
     echo "Deleting Target Group..."
@@ -375,8 +391,8 @@ function phase5() {
     # Delete Security Groups
     echo "Deleting Security Groups..."
     for sg_id in $LAB_SG $RDS_SG $LB_SG; do
-        if [ -n "$sg_id" ]; then
-            aws ec2 delete-security-group --group-id $sg_id
+        if [ -n "$sg_id" ] && [ "$sg_id" != "" ]; then
+            aws ec2 delete-security-group --group-id $sg_id || true
             check_command_success "Deleting Security Group $sg_id"
         fi
     done
@@ -384,49 +400,59 @@ function phase5() {
     # Delete NAT Gateway and Elastic IP
     echo "Deleting NAT Gateway..."
     if [ -n "$NAT_GW_ID" ]; then
-        aws ec2 delete-nat-gateway --nat-gateway-id $NAT_GW_ID
-        aws ec2 wait nat-gateway-deleted --nat-gateway-ids $NAT_GW_ID
+        aws ec2 delete-nat-gateway --nat-gateway-id $NAT_GW_ID || true
+        aws ec2 wait nat-gateway-deleted --nat-gateway-ids $NAT_GW_ID || true
         check_command_success "Deleting NAT Gateway"
     fi
 
     echo "Releasing Elastic IP..."
     if [ -n "$EIP_ALLOC" ]; then
-        aws ec2 release-address --allocation-id $EIP_ALLOC
+        aws ec2 release-address --allocation-id $EIP_ALLOC || true
         check_command_success "Releasing Elastic IP"
     fi
 
     echo "Detaching and deleting Internet Gateway..."
     if [ -n "$IGW_ID" ] && [ -n "$VPC_ID" ]; then
-        aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
-        aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
+        aws ec2 detach-internet-gateway --internet-gateway-id $IGW_ID --vpc-id $VPC_ID || true
+        aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID || true
         check_command_success "Deleting Internet Gateway"
-    fi
-
-    if [ -n "$IGW_ID" ]; then
-        aws ec2 delete-internet-gateway --internet-gateway-id $IGW_ID
-
     fi
 
     # Delete Subnets
     echo "Deleting Subnets..."
     for subnet_id in $PUB_SUBNET1 $PUB_SUBNET2 $PRIV_SUBNET1 $PRIV_SUBNET2 $DB_SUBNET1 $DB_SUBNET2; do
         if [ -n "$subnet_id" ]; then
-            aws ec2 delete-subnet --subnet-id $subnet_id
+            aws ec2 delete-subnet --subnet-id $subnet_id || true
             check_command_success "Deleting Subnet $subnet_id"
         fi
     done
 
-    # Delete Route Tables
-    echo "Deleting Route Tables..."
-    if [ -n "$PRIV_ROUTE_TABLE" ]; then
-        aws ec2 delete-route-table --route-table-id $PRIV_ROUTE_TABLE
-        check_command_success "Deleting Route Table $PRIV_ROUTE_TABLE"
+    # Delete RDS DB Subnet Group
+    echo "Deleting DB Subnet Group..."
+    aws rds delete-db-subnet-group --db-subnet-group-name $DBSubnetGroup || true
+    check_command_success "Deleting RDS DB Subnet Group $DBSubnetGroup"
+
+    # Delete Route Tables (Do not delete the main route table or PRIV_ROUTE_TABLE since it's main)
+    # Removing problematic route table deletion:
+    # if [ -n "$PRIV_ROUTE_TABLE" ]; then
+    #     aws ec2 delete-route-table --route-table-id $PRIV_ROUTE_TABLE || true
+    #     check_command_success "Deleting Route Table $PRIV_ROUTE_TABLE"
+    # fi
+
+    if [ -n "$PUB_ROUTE_TABLE" ]; then
+        aws ec2 delete-route-table --route-table-id $PUB_ROUTE_TABLE || true
+        check_command_success "Deleting Route Table $PUB_ROUTE_TABLE"
+    fi
+
+    if [ -n "$DB_ROUTE_TABLE" ]; then
+        aws ec2 delete-route-table --route-table-id $DB_ROUTE_TABLE || true
+        check_command_success "Deleting Route Table $DB_ROUTE_TABLE"
     fi
 
     # Delete VPC
     echo "Deleting VPC..."
     if [ -n "$VPC_ID" ]; then
-        aws ec2 delete-vpc --vpc-id $VPC_ID
+        aws ec2 delete-vpc --vpc-id $VPC_ID || true
         check_command_success "Deleting VPC"
     fi
 
@@ -434,54 +460,52 @@ function phase5() {
 }
 
 # Execute Phases with Confirmation
+
+# Phase 1
+read -t 120 -p "Start Phase 1? (yes/skip): " cont
+cont="${cont:-yes}"  # Default to "yes" if no input is provided after timeout
+if [[ "$cont" == "yes" ]]; then
+    phase1
+fi
+
+# Phase 2
+read -t 120 -p "Continue to Phase 2? (yes/skip): " cont
+cont="${cont:-yes}"
+if [[ "$cont" == "yes" ]]; then
+    phase2
+fi
+
+# Phase 2.1
+read -t 120 -p "Continue to Phase 2.1? (yes/skip): " cont
+cont="${cont:-yes}"
+if [[ "$cont" == "yes" ]]; then
+    phase21
+fi
+
+# Phase 3
+read -t 120 -p "Continue to Phase 3? (yes/skip): " cont
+cont="${cont:-yes}"
+if [[ "$cont" == "yes" ]]; then
+    phase3
+fi
+
+# Phase 4
+read -t 120 -p "Continue to Phase 4? (yes/skip): " cont
+cont="${cont:-yes}"
+if [[ "$cont" == "yes" ]]; then
+    phase4
+fi
+
+# Phase 5 (Cleanup) with nested loop
 while true; do
-    # Phase 1
-    read -t 120 -p "Start Phase 1? (yes/skip): " cont
-    cont="${cont:-yes}"  # Default to "yes" if no input is provided after timeout
-    if [[ "$cont" == "yes" ]]; then
-        phase1
-    fi
-
-    # Phase 2
-    read -t 120 -p "Continue to Phase 2? (yes/skip): " cont
+    read -t 120 -p "Proceed to Phase 5 (cleanup)? (yes/exit): " cont
     cont="${cont:-yes}"
     if [[ "$cont" == "yes" ]]; then
-        phase2
+        phase5
+    else
+        echo "Exiting Phase 5 and the script."
+        exit 0
     fi
-
-    # Phase 2.1
-    read -t 120 -p "Continue to Phase 2.1? (yes/skip): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase21
-    fi
-
-    # Phase 3
-    read -t 120 -p "Continue to Phase 3? (yes/skip): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase3
-    fi
-
-    # Phase 4
-    read -t 120 -p "Continue to Phase 4? (yes/skip): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase4
-    fi
-
-    # Phase 5 (Cleanup) with nested loop
-    while true; do
-        read -t 120 -p "Proceed to Phase 5 (cleanup)? (yes/exit): " cont
-        cont="${cont:-yes}"
-        if [[ "$cont" == "yes" ]]; then
-            phase5
-        else
-            echo "Exiting Phase 5 and the script."
-            exit 0
-        fi
-    done
-
-    echo "All phases processed. Exiting now..."
-    break
 done
+
+echo "All phases processed. Exiting now..."
