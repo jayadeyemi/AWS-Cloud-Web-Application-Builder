@@ -49,10 +49,10 @@ EIP_TAG="Lab-EIP"
 # RDS Subnet Group Name
 DBSubnetGroup="Lab-DB-Subnet-Group"
 
-# Instance Profile and AMI ID
+# Instance Profile
 INSTANCE_PROFILE_NAME="LabInstanceProfile"
-AMI_ID="ami-0453ec754f44f9a4a"
-
+# Ubuntu AMI ID
+AMI_ID="ami-0e2c8caa4b6378d8c"
 
 # Key Pairs
 PUB_KEY="Public-EC2-KeyPair"
@@ -106,6 +106,37 @@ INSTANCE_ID=""
 NEW_INSTANCE_ID=""
 SERVER_V2_IMAGE_ID=""
 SECRET_ARN=""
+
+
+
+######################################
+# Function to handle each phase
+######################################
+# Function to prompt user to proceed to the next phase
+prompt_phase() {
+    local phase_num=$1
+    local phase_cmd=$2
+    local phase_name=$3
+
+    while true; do
+        read -t 120 -p "Proceed to Phase ${phase_num} (${phase_name})? (yes/exit/[Press Enter to skip]): " cont
+        cont="${cont,,}"  # Convert input to lowercase for case-insensitive comparison
+
+        if [[ "$cont" == "yes" ]]; then
+            echo "Executing Phase ${phase_num}..."
+            $phase_cmd
+            break
+        elif [[ "$cont" == "exit" ]]; then
+            echo "Exiting the script."
+            exit 0
+        elif [[ -z "$cont" ]]; then
+            echo "Skipping Phase ${phase_num}."
+            break
+        else
+            echo "Invalid input. Please enter 'yes', 'exit', or press Enter to skip."
+        fi
+    done
+}
 
 ######################################
 # Phase 1: VPC, Subnets, and EC2 with MySQL
@@ -859,53 +890,31 @@ function Cleaner_helper() {
     echo "Phase 5 Complete: All resources checked and deleted as necessary."
 }
 
+
 ######################################
-# Prompts to Execute Phases 1-5
+# Main Script Execution
 ######################################
+
 while true; do
-    read -t 120 -p "Start Phase 1? (yes/skip/exit): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase1
-    elif [[ "$cont" == "exit" ]]; then
+    echo "######################################"
+    echo "# Prompts to Execute Phases 1-5"
+    echo "######################################"
+
+    # Prompt for each phase
+    prompt_phase 1 phase1 "Phase 1"
+    prompt_phase 2 phase2 "Phase 2"
+    prompt_phase 3 phase3 "Phase 3"
+    prompt_phase 4 phase4 "Phase 4"
+    prompt_phase 5 Cleaner_helper "Phase 5"
+
+    echo "All phases have been processed."
+
+    # Optionally, ask the user if they want to run the phases again
+    read -p "Do you want to run the phases again? (yes/no): " repeat
+    repeat="${repeat,,}"  # Convert input to lowercase
+
+    if [[ "$repeat" != "yes" ]]; then
         echo "Exiting the script."
         exit 0
     fi
-
-    read -t 120 -p "Continue to Phase 2? (yes/skip/exit): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase2
-    elif [[ "$cont" == "exit" ]]; then
-        echo "Exiting the script."
-        exit 0
-    fi
-
-    read -t 120 -p "Continue to Phase 3? (yes/skip/exit): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase3
-    elif [[ "$cont" == "exit" ]]; then
-        echo "Exiting the script."
-        exit 0
-    fi
-
-    read -t 120 -p "Continue to Phase 4? (yes/skip/exit): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        phase4
-    elif [[ "$cont" == "exit" ]]; then
-        echo "Exiting the script."
-        exit 0
-    fi
-
-    read -t 120 -p "Proceed to Phase 5 (cleanup)? (yes/skip/exit): " cont
-    cont="${cont:-yes}"
-    if [[ "$cont" == "yes" ]]; then
-        Cleaner_helper
-    elif [[ "$cont" == "exit" ]]; then
-        echo "Exiting the script."
-        exit 0
-    fi
-
 done
