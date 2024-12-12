@@ -246,7 +246,7 @@ function phase1() {
         --internet-gateway-id "$IGW_ID"
     aws ec2 create-route \
         --route-table-id "$PUB_ROUTE_TABLE" \
-        --destination-cidr-block "INTERNET_CIDR" \
+        --destination-cidr-block "$INTERNET_CIDR" \
         --gateway-id "$IGW_ID"
 
     echo "Creating NAT Gateway and Elastic IP, attaching and creating routes"
@@ -862,38 +862,50 @@ function Cleaner_helper() {
 ######################################
 # Prompts to Execute Phases 1-5
 ######################################
-
-read -t 120 -p "Start Phase 1? (yes/skip): " cont
-cont="${cont:-yes}"
-if [[ "$cont" == "yes" ]]; then
-    phase1
-fi
-
-read -t 120 -p "Continue to Phase 2? (yes/skip): " cont
-cont="${cont:-yes}"
-if [[ "$cont" == "yes" ]]; then
-    phase2
-fi
-
-read -t 120 -p "Continue to Phase 3? (yes/skip): " cont
-cont="${cont:-yes}"
-if [[ "$cont" == "yes" ]]; then
-    phase3
-fi
-
-read -t 120 -p "Continue to Phase 4? (yes/skip): " cont
-cont="${cont:-yes}"
-if [[ "$cont" == "yes" ]]; then
-    phase4
-fi
-
 while true; do
-    read -t 120 -p "Proceed to Phase 5 (cleanup)? (yes/exit): " cont
+    read -t 120 -p "Start Phase 1? (yes/skip/exit): " cont
+    cont="${cont:-yes}"
+    if [[ "$cont" == "yes" ]]; then
+        phase1
+    elif [[ "$cont" == "exit" ]]; then
+        echo "Exiting the script."
+        exit 0
+    fi
+
+    read -t 120 -p "Continue to Phase 2? (yes/skip/exit): " cont
+    cont="${cont:-yes}"
+    if [[ "$cont" == "yes" ]]; then
+        phase2
+    elif [[ "$cont" == "exit" ]]; then
+        echo "Exiting the script."
+        exit 0
+    fi
+
+    read -t 120 -p "Continue to Phase 3? (yes/skip/exit): " cont
+    cont="${cont:-yes}"
+    if [[ "$cont" == "yes" ]]; then
+        phase3
+    elif [[ "$cont" == "exit" ]]; then
+        echo "Exiting the script."
+        exit 0
+    fi
+
+    read -t 120 -p "Continue to Phase 4? (yes/skip/exit): " cont
+    cont="${cont:-yes}"
+    if [[ "$cont" == "yes" ]]; then
+        phase4
+    elif [[ "$cont" == "exit" ]]; then
+        echo "Exiting the script."
+        exit 0
+    fi
+
+    read -t 120 -p "Proceed to Phase 5 (cleanup)? (yes/skip/exit): " cont
     cont="${cont:-yes}"
     if [[ "$cont" == "yes" ]]; then
         Cleaner_helper
-    else
-        echo "Exiting Phase 5 and the script."
+    elif [[ "$cont" == "exit" ]]; then
+        echo "Exiting the script."
         exit 0
     fi
+
 done
