@@ -1,4 +1,4 @@
-#!/bin/bash -xe
+#!/bin/bash
 
 ######################################
 # Predefined Variables for All Resources
@@ -44,14 +44,15 @@ DB_ROUTE_TABLE_NAME="Lab-DB-Route-Table"
 # Gateway Tags
 IGW_TAG="Lab-IGW"
 NAT_GW_TAG="Lab-NAT"
-EIP_TAG="Project-EIP"
+EIP_TAG="Lab-EIP"
 
 # RDS Subnet Group Name
 DBSubnetGroup="Lab-DB-Subnet-Group"
 
-# IAM Role and Instance Profile Names
+# Instance Profile and AMI ID
 INSTANCE_PROFILE_NAME="LabInstanceProfile"
-ROLE_NAME="LabRole"
+AMI_ID="ami-0453ec754f44f9a4a"
+
 
 # Key Pairs
 PUB_KEY="Public-EC2-KeyPair"
@@ -105,7 +106,6 @@ INSTANCE_ID=""
 NEW_INSTANCE_ID=""
 SERVER_V2_IMAGE_ID=""
 SECRET_ARN=""
-SNAPSHOT_ID=""
 
 ######################################
 # Phase 1: VPC, Subnets, and EC2 with MySQL
@@ -282,7 +282,7 @@ function phase1() {
         --group-id "$LAB_SG" \
         --protocol tcp \
         --port 80 \
-        --cidr 0.0.0.0/0
+        --cidr "$INTERNET_CIDR"
     aws ec2 authorize-security-group-ingress \
         --group-id "$LAB_SG" \
         --protocol tcp \
@@ -302,7 +302,7 @@ function phase1() {
     chmod 400 "$PUB_KEY.pem"
 
     INSTANCE_ID=$(aws ec2 run-instances \
-        --image-id ami-0453ec754f44f9a4a \
+        --image-id "$AMI_ID" \
         --count 1 \
         --instance-type t2.micro \
         --key-name "$PUB_KEY" \
@@ -414,18 +414,57 @@ function phase2() {
         --output text > "$PRIV_KEY.pem"
     chmod 400 "$PRIV_KEY.pem"
 
-    echo "Creating EC2-v2"
-    NEW_INSTANCE_ID=$(aws ec2 run-instances \
-        --image-id ami-0453ec754f44f9a4a \
-        --count 1 \
-        --instance-type t2.micro \
-        --key-name "$PRIV_KEY" \
-        --security-group-ids "$LAB_SG" \
-        --subnet-id "$PUB_SUBNET1" \
-        --iam-instance-profile Name="$INSTANCE_PROFILE_NAME" \
-        --user-data file://"$USER_DATA_FILE_V2" \
-        --query 'Instances[0].InstanceId' \
-        --output text)
+    # Check if the instance profile is set and exists in IAM
+    if [[ -n "$INSTANCE_PROFILE_NAME" ]]; then
+        echo "Checking if IAM instance profile '$INSTANCE_PROFILE_NAME' exists..."
+
+        if aws iam get-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" >/dev/null 2>&1; then
+            echo "IAM instance profile '$INSTANCE_PROFILE_NAME' found."
+            echo "Launching EC2 instance with IAM instance profile..."
+            
+            NEW_INSTANCE_ID=$(aws ec2 run-instances \
+                --image-id "$AMI_ID" \
+                --count 1 \
+                --instance-type t2.micro \
+                --key-name "$PRIV_KEY" \
+                --security-group-ids "$LAB_SG" \
+                --subnet-id "$PUB_SUBNET1" \
+                --iam-instance-profile Name="$INSTANCE_PROFILE_NAME" \
+                --user-data file://"$USER_DATA_FILE_V2" \
+                --query 'Instances[0].InstanceId' \
+                --output text)
+        else
+            echo "IAM instance profile '$INSTANCE_PROFILE_NAME' does not exist."
+            echo "Launching EC2 instance without IAM role..."
+            
+            NEW_INSTANCE_ID=$(aws ec2 run-instances \
+                --image-id "$AMI_ID" \
+                --count 1 \
+                --instance-type t2.micro \
+                --key-name "$PRIV_KEY" \
+                --security-group-ids "$LAB_SG" \
+                --subnet-id "$PUB_SUBNET1" \
+                --user-data file://"$USER_DATA_FILE_V2" \
+                --query 'Instances[0].InstanceId' \
+                --output text)
+        fi
+    else
+        echo "No INSTANCE_PROFILE_NAME provided."
+        echo "Launching EC2 instance without IAM role..."
+        
+        NEW_INSTANCE_ID=$(aws ec2 run-instances \
+            --image-id "$AMI_ID" \
+            --count 1 \
+            --instance-type t2.micro \
+            --key-name "$PRIV_KEY" \
+            --security-group-ids "$LAB_SG" \
+            --subnet-id "$PUB_SUBNET1" \
+            --user-data file://"$USER_DATA_FILE_V2" \
+            --query 'Instances[0].InstanceId' \
+            --output text)
+    fi
+
+
 
     aws ec2 wait instance-status-ok \
         --instance-ids "$NEW_INSTANCE_ID"
@@ -458,25 +497,74 @@ function phase2() {
 # Phase 3: Load Balancer and Auto Scaling
 ######################################
 function phase3() {
+
+    # Check if the instance profile is set and exists in IAM
+    if [[ -n "$INSTANCE_PROFILE_NAME" ]]; then
+        echo "Checking if IAM instance profile '$INSTANCE_PROFILE_NAME' exists..."
+
+        if aws iam get-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" >/dev/null 2>&1; then
+            echo "IAM instance profile '$INSTANCE_PROFILE_NAME' found."
+            echo "Creating a Launch Template for Ec2-v3 instance with IAM role..."
+                aws ec2 create-launch-template \
+                    --launch-template-name "$LAUNCH_TEMPLATE_NAME" \
+                    --launch-template-data "{
+                        \"ImageId\": \"$SERVER_V2_IMAGE_ID\",
+                        \"InstanceType\": \"t2.micro\",
+                        \"KeyName\": \"$PRIV_KEY\",
+                        \"IamInstanceProfile\": {\"Name\": \"$INSTANCE_PROFILE_NAME\"},
+                        \"TagSpecifications\": [
+                            {
+                                \"ResourceType\": \"instance\",
+                                \"Tags\": [
+                                    {\"Key\": \"Name\", \"Value\": \"$EC2_V2_NAME\"}
+                                ]
+                            }
+                        ]
+                    }"
+        else
+            echo "IAM instance profile '$INSTANCE_PROFILE_NAME' does not exist."
+            echo "Creating a Launch Template for Ec2-v3 instance without IAM role..."
+            aws ec2 create-launch-template \
+                --launch-template-name "$LAUNCH_TEMPLATE_NAME" \
+                --launch-template-data "{
+                    \"ImageId\": \"$SERVER_V2_IMAGE_ID\",
+                    \"InstanceType\": \"t2.micro\",
+                    \"KeyName\": \"$PRIV_KEY\",
+                    \"TagSpecifications\": [
+                        {
+                            \"ResourceType\": \"instance\",
+                            \"Tags\": [
+                                {\"Key\": \"Name\", \"Value\": \"$EC2_V2_NAME\"}
+                            ]
+                        }
+                    ]
+                }"
+        fi
+    else
+        echo "INSTANCE_PROFILE_NAME variable not defined in code."
+        echo "Creating a Launch Template for Ec2-v3 instance without IAM role..."
+        aws ec2 create-launch-template \
+            --launch-template-name "$LAUNCH_TEMPLATE_NAME" \
+            --launch-template-data "{
+                \"ImageId\": \"$SERVER_V2_IMAGE_ID\",
+                \"InstanceType\": \"t2.micro\",
+                \"KeyName\": \"$PRIV_KEY\",
+                \"TagSpecifications\": [
+                    {
+                        \"ResourceType\": \"instance\",
+                        \"Tags\": [
+                            {\"Key\": \"Name\", \"Value\": \"$EC2_V2_NAME\"}
+                        ]
+                    }
+                ]
+            }"
+
+    fi
+
+    
+
     echo "Starting Phase 3: Setting up Load Balancer and Auto Scaling"
 
-    echo "Creating a Launch Template for Ec2-v3 instance..."
-    aws ec2 create-launch-template \
-        --launch-template-name "$LAUNCH_TEMPLATE_NAME" \
-        --launch-template-data "{
-            \"ImageId\": \"$SERVER_V2_IMAGE_ID\",
-            \"InstanceType\": \"t2.micro\",
-            \"KeyName\": \"$PRIV_KEY\",
-            \"IamInstanceProfile\": {\"Name\": \"$INSTANCE_PROFILE_NAME\"},
-            \"TagSpecifications\": [
-                {
-                    \"ResourceType\": \"instance\",
-                    \"Tags\": [
-                        {\"Key\": \"Name\", \"Value\": \"$EC2_V2_NAME\"}
-                    ]
-                }
-            ]
-        }"
 
     
     echo "Modifying Security Groups for LB and private subnets"
@@ -484,7 +572,7 @@ function phase3() {
         --group-id "$LAB_SG" \
         --protocol tcp \
         --port 80 \
-        --cidr 0.0.0.0/0 || true
+        --cidr "$INTERNET_CIDR"
 
     LB_SG=$(aws ec2 create-security-group \
         --group-name "$LB_SG_NAME" \
@@ -497,7 +585,7 @@ function phase3() {
         --group-id "$LB_SG" \
         --protocol tcp \
         --port 80 \
-        --cidr 0.0.0.0/0
+        --cidr "$INTERNET_CIDR"
 
     aws ec2 authorize-security-group-ingress \
         --group-id "$LAB_SG" \
@@ -563,6 +651,7 @@ function phase3() {
            "ScaleInCooldown":60
         }'
 
+
     echo "Phase 3 Complete: Load Balancer and Auto Scaling setup finished"
 }
 
@@ -611,40 +700,17 @@ function Cleaner_helper() {
         sleep 60
     fi
 
-    # Remove IAM Instance Profile and Role
-    if aws iam get-instance-profile --instance-profile-name "$INSTANCE_PROFILE_NAME" >/dev/null 2>&1; then
-        aws iam remove-role-from-instance-profile \
-            --instance-profile-name "$INSTANCE_PROFILE_NAME" \
-            --role-name "$ROLE_NAME"
-        aws iam delete-instance-profile \
-            --instance-profile-name "$INSTANCE_PROFILE_NAME"
-        echo "Instance Profile $INSTANCE_PROFILE_NAME deleted."
-    fi
-
-    if aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
-        aws iam delete-role \
-            --role-name "$ROLE_NAME"
-        echo "IAM Role $ROLE_NAME deleted."
-    fi
-
     # Terminate EC2 instances
-    if [ -n "$INSTANCE_ID" ]; then
-        echo "Terminating EC2 instance: $INSTANCE_ID"
-        aws ec2 terminate-instances \
-            --instance-ids "$INSTANCE_ID" || true
-        aws ec2 wait instance-terminated \
-            --instance-ids "$INSTANCE_ID" || true
-        check_command_success "Terminating EC2 instance $INSTANCE_ID"
-    fi
-
-    if [ -n "$NEW_INSTANCE_ID" ]; then
-        echo "Terminating EC2 instance: $NEW_INSTANCE_ID"
-        aws ec2 terminate-instances \
-            --instance-ids "$NEW_INSTANCE_ID" || true
-        aws ec2 wait instance-terminated \
-            --instance-ids "$NEW_INSTANCE_ID" || true
-        check_command_success "Terminating EC2 instance $NEW_INSTANCE_ID"
-    fi
+    for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"; do
+        if [ -n "$instance_id" ]; then
+            echo "Terminating EC2 instance: $instance_id"
+            aws ec2 terminate-instances \
+                --instance-ids "$instance_id" || true
+            aws ec2 wait instance-terminated \
+                --instance-ids "$instance_id" || true
+            check_command_success "Terminating EC2 instance $instance_id"
+        fi
+    done
 
     # Delete Launch Template
     echo "Deleting Launch Template..."
@@ -662,7 +728,7 @@ function Cleaner_helper() {
     fi
 
     # Delete associated snapshot if any
-    if [ -n "$SNAPSHOT_ID" ] && [ "$SNAPSHOT_ID" != "" ]; then
+    if [ -n "$SNAPSHOT_ID" ]; then
         aws ec2 delete-snapshot \
             --snapshot-id "$SNAPSHOT_ID"
         echo "Snapshot deleted."
@@ -716,7 +782,7 @@ function Cleaner_helper() {
     # Delete Security Groups
     echo "Deleting Security Groups..."
     for sg_id in "$LAB_SG" "$RDS_SG" "$LB_SG"; do
-        if [ -n "$sg_id" ] && [ "$sg_id" != "" ]; then
+        if [ -n "$sg_id" ]; then
             aws ec2 delete-security-group \
                 --group-id "$sg_id" || true
             check_command_success "Deleting Security Group $sg_id"
@@ -731,6 +797,7 @@ function Cleaner_helper() {
         aws ec2 wait nat-gateway-deleted \
             --nat-gateway-ids "$NAT_GW_ID" || true
         check_command_success "Deleting NAT Gateway"
+        sleep 60
     fi
 
     echo "Releasing Elastic IP..."
@@ -755,6 +822,8 @@ function Cleaner_helper() {
     for subnet_id in "$PUB_SUBNET1" "$PUB_SUBNET2" "$PRIV_SUBNET1" "$PRIV_SUBNET2" "$DB_SUBNET1" "$DB_SUBNET2"; do
         if [ -n "$subnet_id" ]; then
             aws ec2 delete-subnet \
+                --subnet-id "$subnet_id" || true
+            aws ec2 wait subnet-deleted \
                 --subnet-id "$subnet_id" || true
             check_command_success "Deleting Subnet $subnet_id"
         fi
@@ -791,7 +860,7 @@ function Cleaner_helper() {
 }
 
 ######################################
-# Prompts to Execute Phases
+# Prompts to Execute Phases 1-5
 ######################################
 
 read -t 120 -p "Start Phase 1? (yes/skip): " cont
