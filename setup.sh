@@ -1005,7 +1005,6 @@ phase3() {
     fi
 
     if [[ $status -eq 0 ]]; then
-        sleep 120
         echo " Creating Auto Scaling Group..."
         execute_command "aws autoscaling create-auto-scaling-group \
             --auto-scaling-group-name "$EC2_ASG_NAME" \
@@ -1022,7 +1021,6 @@ phase3() {
     fi
 
     if [[ $status -eq 0 ]]; then
-        sleep 120
         execute_command "LB_DNS=\$(aws elbv2 describe-load-balancers \
             --names "$LB_NAME" \
             --query 'LoadBalancers[0].DNSName' \
