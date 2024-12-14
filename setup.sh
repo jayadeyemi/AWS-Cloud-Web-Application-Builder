@@ -555,7 +555,7 @@ phase1() {
 
     if [[ $status -eq 0 ]]; then
         execute_command "aws ec2 create-route \
-            --route-table-id \"$PUBLIC_ROUTE_TABLE_ID\" \
+            --route-table-id \"$MAIN_ROUTE_TABLE_ID\" \
             --destination-cidr-block \"$DEFAULT_VPC_CIDR\" \
             --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\"" \
             "Failed to update Lab VPC route table for peering connection."
@@ -685,7 +685,7 @@ phase1() {
             "Failed to access the application."
         status=$?
     fi
-    
+
     if [[ $status -eq 0 ]]; then
         execute_command "mysql -h \"$RDS_ENDPOINT\" \
             -u $SECRET_USERNAME \
@@ -1191,18 +1191,35 @@ phase5() {
         check_command_success "Deleting Auto Scaling Group"
     fi
 
-    # Delete Security Group Rules
+    # List of security group IDs
     for sg_id in "$LAB_SG" "$RDS_SG" "$LB_SG"; do
-        for rule in $(aws ec2 describe-security-group-rules \
-            --filters "Name=group-id,Values=$sg_id" \
-            --query "SecurityGroupRules[?IsEgress==\`false\`].SecurityGroupRuleId" \
-            --output text); do
-            aws ec2 revoke-security-group-ingress \
-                --group-id "$sg_id" \
-                --security-group-rule-ids "$rule" \
-                --output text || true
-        done
-        check_command_success "Deleting Security Group Rules for $sg_id"
+        if [[ -n "$sg_id" ]]; then
+            echo "Processing Security Group: $sg_id"
+
+            # Fetch all ingress rule IDs for the security group
+            rule_ids=$(aws ec2 describe-security-group-rules \
+                --filters "Name=group-id,Values=$sg_id" \
+                --query 'SecurityGroupRules[?Egress==`false`].SecurityGroupRuleId' \
+                --output text)
+
+            if [[ -n "$rule_ids" ]]; then
+                for rule in $rule_ids; do
+                    # Revoke each rule and log the result
+                    if aws ec2 revoke-security-group-ingress \
+                        --group-id "$sg_id" \
+                        --security-group-rule-ids "$rule" \
+                        --output text; then
+                        echo "Successfully revoked rule $rule from $sg_id"
+                    else
+                        echo "Failed to revoke rule $rule from $sg_id" >&2
+                    fi
+                done
+            else
+                echo "No ingress rules found for Security Group: $sg_id"
+            fi
+        else
+            echo "Security Group ID is empty, skipping."
+        fi
     done
     
     for sg_id in "$LAB_SG" "$RDS_SG" "$LB_SG"; do
