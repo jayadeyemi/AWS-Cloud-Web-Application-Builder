@@ -5,7 +5,7 @@
 
 # Prompting for user IPs and Cloud9 Public IPs for security group rules
 USER_PUBLIC_IP_INPUT="68.50.23.166"
-CLOUD9_PRIVATE_IP_INPUT="54.235.26.191"
+CLOUD9_PRIVATE_IP_INPUT="172.31.25.86"
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
@@ -50,6 +50,7 @@ AMI_ID="ami-0e2c8caa4b6378d8c"
 PUB_KEY="Public-EC2-KeyPair"
 PRIV_KEY="Private-EC2-KeyPair"
 # User Data Files
+SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 USER_DATA_FILE_V1="phase1_userdata.sh"
 USER_DATA_FILE_V2="phase2_userdata.sh"
 ASG_config = "ASG_config.json"  
@@ -670,27 +671,13 @@ phase1() {
     fi
 
     if [[ $status -eq 0 ]]; then
-        execute_command "ssh -i /home/ec2-user/environment/AWS-Projects/Public-EC2-KeyPair.pem \
-        -o StrictHostKeyChecking=no \
-        ubuntu@$INSTANCE_PRIVATE_IP" \
-            "Failed to SSH into the EC2 instance."
-        status=$?
-    fi
-    #dump the data from the EC2 instance to the RDS instance
-    if [[ $status -eq 0 ]]; then
-        execute_command "mysqldump -h \"$INSTANCE_PRIVATE_IP\" \
-            -u nodeapp \
-            -pstudent12 \
-            --databases STUDENTS > data.sql" \
-            "Failed to access the application."
-        status=$?
-    fi
-
-    if [[ $status -eq 0 ]]; then
-        execute_command "mysql -h \"$RDS_ENDPOINT\" \
-            -u $SECRET_USERNAME \
-            -p$SECRET_PASSWORD STUDENTS < data.sql" \
-            "Failed to migrate data to RDS MySQL instance."
+        execute_command "ssh -i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP <<EOF
+            echo 'Dumping MySQL database...'
+            mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
+            echo 'Database dump completed on the remote instance.'
+EOF
+        scp -i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
+        "Failed to migrate MySQL data to Cloud9 instance."
         status=$?
     fi
 
@@ -1103,7 +1090,6 @@ phase5() {
             aws ec2 delete-key-pair \
                 --key-name "$key_name" || true
             # Reference the current file location
-            SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
             rm -f "$SCRIPT_DIR/$key_name.pem" || true
             check_command_success "Deleting key pair $key_name"
         fi
