@@ -3,13 +3,13 @@
 # Predefined Static Variables for All Resources
 ######################################
 
-# Prompting for user IPs and storing them in predefined variables
-USER_IP_INPUT="68.50.23.166"
-CLOUD9_IP_INPUT="172.31.25.86"
+# Prompting for user IPs and Cloud9 Public IPs for security group rules
+USER_PUBLIC_IP_INPUT="68.50.23.166"
+CLOUD9_PUBLIC_IP_INPUT="54.235.26.191"
 
 # Defining variables for IPs
-USER_IP=$USER_IP_INPUT
-CLOUD9_IP=$CLOUD9_IP_INPUT
+USER_IP=$USER_PUBLIC_IP_INPUT
+CLOUD9_IP=$CLOUD9_PUBLIC_IP_INPUT
 # VPC and Subnet Names
 VPC_NAME="Lab-VPC"
 PUB_SUBNET1_NAME="Lab-Public-Subnet1"
@@ -1326,12 +1326,13 @@ log_status() {
     local command=$2
     local status=$3
     ID=$((ID+1))
+    formatted_id=$(printf "%03d" $ID)
 
     if [[ $status -eq 0 ]]; then
-        echo $ID ": [SUCCESS]: $command executed successfully." >>execution.log
+        echo "$formatted_id: [SUCCESS]: $command executed successfully." >>execution.log
     else
-        echo $ID ": [FAILURE]: $command failed." >>execution.log
-    echo $ID ": [RESPONSE]: $response" >> response.log
+        echo "$formatted_id: [FAILURE]: $command failed." >>execution.log
+        echo "$formatted_id: [RESPONSE]: $response" >>response.log
     fi
 }
 
