@@ -60,8 +60,8 @@ EC2_IMAGE1_NAME="Lab-Server-v1-Image"
 EC2_IMAGE2_NAME="Lab-Server-v2-Image"
 
 # Secrets Manager Name
-SECRET_NAME="Test-Secret-v1"
-SECRET_PASSWORD=$(openssl rand -base64 12)
+SECRET_NAME="Test-Secret-v2"
+SECRET_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12)
 SECRET_USERNAME="admin"
 # RDS Identifier and Tags
 RDS_IDENTIFIER="Lab-DB"
@@ -1164,12 +1164,13 @@ phase5() {
     # Delete Security Group Rules
     for sg_id in "$LAB_SG" "$RDS_SG" "$LB_SG"; do
         for rule in $(aws ec2 describe-security-group-rules \
-            --filters "Name=group-id,Values=$sg_id" \
+            --filters "Name=group-id,Values=$sg_id" "Name=is-egress,Values=false" \
             --query "SecurityGroupRules[*].SecurityGroupRuleId" \
             --output text); do
             aws ec2 revoke-security-group-ingress \
                 --group-id "$sg_id" \
-                --security-group-rule-ids "$rule" || true
+                --security-group-rule-ids "$rule" \
+                --output text || true
         done
         check_command_success "Deleting Security Group Rules for $sg_id"
     done
