@@ -60,7 +60,7 @@ EC2_IMAGE1_NAME="Lab-Server-v1-Image"
 EC2_IMAGE2_NAME="Lab-Server-v2-Image"
 
 # Secrets Manager Name
-SECRET_NAME="Test-Secret-v2"
+SECRET_NAME="Test-Secret-v3"
 SECRET_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12)
 SECRET_USERNAME="admin"
 # RDS Identifier and Tags
@@ -815,9 +815,9 @@ phase2() {
             "Failed to create RDS MySQL instance."
         status=$?
     fi
-        sleep 300
 
     if [[ $status -eq 0 ]]; then
+        sleep 300
         execute_command "aws rds wait db-instance-available \
             --db-instance-identifier \"$RDS_INSTANCE\"" \
             "RDS MySQL instance did not become available in time."
@@ -978,8 +978,8 @@ phase3() {
             "Failed to create Target Group."
         status=$?
     fi
-    sleep 60
     if [[ $status -eq 0 ]]; then
+        sleep 60
         echo "Creating Load Balancer, Listener, and attaching Target Group..."
         execute_command "LB_ARN=\$(aws elbv2 create-load-balancer \
             --name \"$LB_NAME\" \
@@ -998,9 +998,9 @@ phase3() {
             "Load Balancer did not become available in time."
         status=$?
     fi
-    sleep 120
 
     if [[ $status -eq 0 ]]; then
+        sleep 120
         echo " Creating Auto Scaling Group..."
         execute_command "aws autoscaling create-auto-scaling-group \
             --auto-scaling-group-name "$EC2_ASG_NAME" \
@@ -1013,11 +1013,11 @@ phase3() {
             --load-balancer-names "$LB_NAME" \
               --target-tracking-configuration file://config.json" \
             "Failed to create Auto Scaling Group."
-        sleep 120
         status=$?
     fi
 
     if [[ $status -eq 0 ]]; then
+        sleep 120
         execute_command "LB_DNS=\$(aws elbv2 describe-load-balancers \
             --names \"$LB_NAME\" \
             --query 'LoadBalancers[0].DNSName' \
@@ -1114,7 +1114,12 @@ phase5() {
         check_command_success "Deleting Launch Template"
     fi
 
-    # Deregister AMI
+    # Deregister AMIs
+    if [ -n "$SERVER_V1_IMAGE_ID" ]; then
+        aws ec2 deregister-image \
+            --image-id "$SERVER_V1_IMAGE_ID"
+        check_command_success "Deregistering AMI $SERVER_V1_IMAGE_ID"
+    fi
     if [ -n "$SERVER_V2_IMAGE_ID" ]; then
         aws ec2 deregister-image \
             --image-id "$SERVER_V2_IMAGE_ID"
@@ -1164,8 +1169,8 @@ phase5() {
     # Delete Security Group Rules
     for sg_id in "$LAB_SG" "$RDS_SG" "$LB_SG"; do
         for rule in $(aws ec2 describe-security-group-rules \
-            --filters "Name=group-id,Values=$sg_id" "Name=is-egress,Values=false" \
-            --query "SecurityGroupRules[*].SecurityGroupRuleId" \
+            --filters "Name=group-id,Values=$sg_id" \
+            --query "SecurityGroupRules[?IsEgress==\`false\`].SecurityGroupRuleId" \
             --output text); do
             aws ec2 revoke-security-group-ingress \
                 --group-id "$sg_id" \
