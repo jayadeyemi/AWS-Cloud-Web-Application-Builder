@@ -5,11 +5,11 @@
 
 # Prompting for user IPs and Cloud9 Public IPs for security group rules
 USER_PUBLIC_IP_INPUT="68.50.23.166"
-CLOUD9_PUBLIC_IP_INPUT="54.235.26.191"
+CLOUD9_PRIVATE_IP_INPUT="54.235.26.191"
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
-CLOUD9_IP=$CLOUD9_PUBLIC_IP_INPUT
+CLOUD9_IP=$CLOUD9_PRIVATE_IP_INPUT
 # VPC and Subnet Names
 VPC_NAME="Lab-VPC"
 PUB_SUBNET1_NAME="Lab-Public-Subnet1"
@@ -555,7 +555,7 @@ phase1() {
 
     if [[ $status -eq 0 ]]; then
         execute_command "aws ec2 create-route \
-            --route-table-id \"$PRIV_ROUTE_TABLE\" \
+            --route-table-id \"$PUBLIC_ROUTE_TABLE_ID\" \
             --destination-cidr-block \"$DEFAULT_VPC_CIDR\" \
             --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\"" \
             "Failed to update Lab VPC route table for peering connection."
@@ -670,6 +670,31 @@ phase1() {
     fi
 
     if [[ $status -eq 0 ]]; then
+        execute_command "ssh -i /home/ec2-user/environment/AWS-Projects/Public-EC2-KeyPair.pem \
+        -o StrictHostKeyChecking=no \
+        ubuntu@$INSTANCE_PRIVATE_IP" \
+            "Failed to SSH into the EC2 instance."
+        status=$?
+    fi
+    #dump the data from the EC2 instance to the RDS instance
+    if [[ $status -eq 0 ]]; then
+        execute_command "mysqldump -h \"$INSTANCE_PRIVATE_IP\" \
+            -u nodeapp \
+            -pstudent12 \
+            --databases STUDENTS > data.sql" \
+            "Failed to access the application."
+        status=$?
+    fi
+    
+    if [[ $status -eq 0 ]]; then
+        execute_command "mysql -h \"$RDS_ENDPOINT\" \
+            -u $SECRET_USERNAME \
+            -p$SECRET_PASSWORD STUDENTS < data.sql" \
+            "Failed to migrate data to RDS MySQL instance."
+        status=$?
+    fi
+
+    if [[ $status -eq 0 ]]; then
         echo -e "\n\n\n"
         echo ######################################
         echo "# Phase 1 Completed Successfully."
@@ -712,7 +737,6 @@ phase2() {
         status=$?
     fi
 
-
     echo "Creating RDS secret for MySQL credentials"
     if [[ $status -eq 0 ]]; then
         echo "Creating RDS secret in Secrets Manager..."
@@ -726,6 +750,7 @@ phase2() {
             "Failed to create RDS secret."
         status=$?
     fi
+
     if [[ $status -eq 0 ]]; then
         execute_command "RDS_SG=\$(aws ec2 create-security-group \
             --group-name \"$RDS_SG_NAME\" \
@@ -836,7 +861,6 @@ phase2() {
         status=$?
     fi
 
-    echo "Migrating data to RDS..."
     if [[ $status -eq 0 ]]; then
         execute_command "mysqldump -h \"$INSTANCE_PRIVATE_IP\" \
             -u nodeapp \
@@ -865,12 +889,10 @@ phase2() {
         status=$?
     fi
 
-
     if [[ $status -eq 0 ]]; then
         echo "Image created with ID: $SERVER_V1_IMAGE_ID"
     fi
 
-    echo "Terminating original EC2-v1"
     if [[ $status -eq 0 ]]; then
         execute_command "TERMINATED_INSTANCE=/$(aws ec2 terminate-instances \
             --instance-ids \"$INSTANCE_ID\" \
