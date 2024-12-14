@@ -671,17 +671,6 @@ phase1() {
     fi
 
     if [[ $status -eq 0 ]]; then
-        execute_command "ssh -i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP <<EOF
-            echo 'Dumping MySQL database...'
-            mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
-            echo 'Database dump completed on the remote instance.'
-EOF
-        scp -i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
-        "Failed to migrate MySQL data to Cloud9 instance."
-        status=$?
-    fi
-
-    if [[ $status -eq 0 ]]; then
         echo -e "\n\n\n"
         echo ######################################
         echo "# Phase 1 Completed Successfully."
@@ -847,20 +836,25 @@ phase2() {
             "Failed to retrieve RDS MySQL endpoint."
         status=$?
     fi
-
     if [[ $status -eq 0 ]]; then
-        execute_command "mysqldump -h \"$INSTANCE_PRIVATE_IP\" \
-            -u nodeapp \
-            -pstudent12 \
-            --databases STUDENTS > data.sql" \
-            "Failed to dump data from EC2 instance."
+        execute_command "ssh -i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP <<EOF
+            echo 'Dumping MySQL database...'
+            mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
+            echo 'Database dump completed on the remote instance.'
+            EOF
+            scp \-i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
+        "Failed to migrate MySQL data to Cloud9 instance."
         status=$?
     fi
 
     if [[ $status -eq 0 ]]; then
-        execute_command "mysql -h \"$RDS_ENDPOINT\" \
-            -u $SECRET_USERNAME \
-            -p$SECRET_PASSWORD STUDENTS < data.sql" \
+        execute_command "mysql -h $RDS_ENDPOINT \
+            -u $RDS_USERNAME \
+            -p$RDS_PASSWORD \
+            -e "CREATE DATABASE STUDENTS;
+            mysql -h "$RDS_ENDPOINT" \
+                -u $SECRET_USERNAME \
+                -p$SECRET_PASSWORD STUDENTS < SCRIPT_DIR/data.sql" \
             "Failed to migrate data to RDS MySQL instance."
         status=$?
     fi
