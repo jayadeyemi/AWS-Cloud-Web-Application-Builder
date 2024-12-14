@@ -647,6 +647,10 @@ phase1() {
         execute_command "aws ec2 wait instance-running \
             --instance-ids \"$INSTANCE_ID\"" \
             "EC2 instance did not start within the expected time."
+            execute_command "aws ec2 wait instance-status-ok \
+            --instance-ids \"$INSTANCE_ID\" \
+            --cli-read-timeout 0" \
+            "EC2 instance did not pass status checks within the expected time."
         status=$?
     fi
 
@@ -669,9 +673,8 @@ phase1() {
         echo -e "\n\n\n"
         echo ######################################
         echo "# Phase 1 Completed Successfully."
-        echo "# Please wait 5 minutes for the web application to be fully operational."
         echo "# You can access the application at http://$INSTANCE_PUBLIC_IP"
-        echo "# The instance needs to be fully operational before proceeding to Phase 2."
+        echo "# The instance is fully operational."
         echo ######################################
     else
         echo -e "\n\n\n"
@@ -817,9 +820,9 @@ phase2() {
     fi
 
     if [[ $status -eq 0 ]]; then
-        sleep 300
         execute_command "aws rds wait db-instance-available \
-            --db-instance-identifier \"$RDS_INSTANCE\"" \
+            --db-instance-identifier "$RDS_INSTANCE" \
+            --cli-read-timeout 0" \
             "RDS MySQL instance did not become available in time."
         status=$?
     fi
@@ -968,11 +971,11 @@ phase3() {
     if [[ $status -eq 0 ]]; then
         echo "Creating Target Group..."
         execute_command "TG_ARN=\$(aws elbv2 create-target-group \
-            --name \"$TG_NAME\" \
+            --name "$TG_NAME" \
             --protocol HTTP \
             --port 80 \
-            --vpc-id \"$VPC_ID\" \
-            --tags Key=Name,Value=\"$TG_NAME\" \
+            --vpc-id "$VPC_ID" \
+            --tags Key=Name,Value="$TG_NAME" \
             --query 'TargetGroups[0].TargetGroupArn' \
             --output text)" \
             "Failed to create Target Group."
@@ -982,9 +985,9 @@ phase3() {
         sleep 60
         echo "Creating Load Balancer, Listener, and attaching Target Group..."
         execute_command "LB_ARN=\$(aws elbv2 create-load-balancer \
-            --name \"$LB_NAME\" \
-            --subnets \"$PUB_SUBNET1\" \"$PUB_SUBNET2\" \
-            --security-groups \"$LB_SG\" \
+            --name "$LB_NAME" \
+            --subnets "$PUB_SUBNET1" "$PUB_SUBNET2" \
+            --security-groups "$LB_SG" \
             --ip-address-type ipv4 \
             --query 'LoadBalancers[0].LoadBalancerArn' \
             --output text)" \
@@ -994,7 +997,9 @@ phase3() {
 
     if [[ $status -eq 0 ]]; then
         execute_command "aws elbv2 wait load-balancer-available \
-            --load-balancer-arns \"$LB_ARN\"" \
+            --load-balancer-arns "$LB_ARN" \
+            --cli-read-timeout 0 \
+            --output text" \
             "Load Balancer did not become available in time."
         status=$?
     fi
@@ -1019,7 +1024,7 @@ phase3() {
     if [[ $status -eq 0 ]]; then
         sleep 120
         execute_command "LB_DNS=\$(aws elbv2 describe-load-balancers \
-            --names \"$LB_NAME\" \
+            --names "$LB_NAME" \
             --query 'LoadBalancers[0].DNSName' \
             --output text)" \
             "Failed to retrieve Load Balancer DNS."
@@ -1287,8 +1292,8 @@ phase5() {
 execute_command() {
     local command=$1
     local error_message=$2
-    local retries=3
-    local delay=5
+    local retries=5
+    local delay=30
 
     echo "Executing: $command"
     retry_command "$command" $retries $delay
