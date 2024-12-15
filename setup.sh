@@ -41,7 +41,6 @@ done
 
 # Display the chosen default file
 echo "The default file is set to: $DEFAULT_DB_FILE"
-# wait 5
 sleep 5
 
 # Defining variables for IPs
