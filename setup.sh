@@ -886,12 +886,12 @@ phase2() {
         status=$?
     fi
     
-ssh -i ./Public-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@$ << 'EOF'
+ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP << 'EOF'
 echo 'Dumping MySQL database...'
 mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
 echo 'Database dump completed on the remote instance.'
 EOF
-scp -i ./Public-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@192.168.1.45:/tmp/data.sql ./data.sql
+scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql
 
     if [[ $status -eq 0 ]]; then
         execute_command "mysql -h $RDS_ENDPOINT \
