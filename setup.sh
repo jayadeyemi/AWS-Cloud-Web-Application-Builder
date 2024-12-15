@@ -2,16 +2,18 @@
 
 # Description: This script is used to create the necessary resources for the Inventory application.
 
-######################################
+############################################################################################################
 # User Inputs
-######################################
+############################################################################################################
 # User Public IP, Cloud9 Private IP
 USER_PUBLIC_IP_INPUT="68.50.23.166" # Change this to your public IP for local SSH access to instances
+CLOUD9_INSTANCE_ID="i-09148fc063df1a9c6" # Change this to your Cloud9 instance ARN
+# Availability Zones 
+AVAILABILITY_ZONE1="us-east-1a" # Change this to your preferred availability zone
+AVAILABILITY_ZONE2="us-east-1b" # Change this to your preferred availability zone
+############################################################################################################
 
-CLOUD9_INSTANCE_ID="i-09148fc063df1a9c6" # Change this to your Cloud9 instance ARN 
-
-# Obtain the Cloud9 private IP address
-CLOUD9_PRIVATE_IP_INPUT=$(aws ec2 describe-instances \
+#Using CLOUD9_PRIVATE_IP_INPUT to get the Cloud9 Details
     --instance-ids $CLOUD9_INSTANCE_ID \
     --query 'Reservations[0].Instances[0].PrivateIpAddress' \
     --output text)
@@ -55,8 +57,7 @@ DB_SUBNET1_CIDR="192.168.5.0/24"
 DB_SUBNET2_CIDR="192.168.6.0/24"
 INTERNET_CIDR="0.0.0.0/0"
 aws configure set region us-east-1
-AVAILABILITY_ZONE1="us-east-1a"
-AVAILABILITY_ZONE2="us-east-1b"
+
 # Security Group Names
 EC2_SG_NAME="Inventory-Server-SG"
 RDS_SG_NAME="Inventory-DB-SG"
@@ -91,14 +92,13 @@ EC2_IMAGE1_NAME="Inventory-Server-v1-Image"
 EC2_IMAGE2_NAME="Inventory-Server-v2-Image"
 
 # Secrets Manager Name
-SECRET_NAME="Test-Secret-v6"
+SECRET_NAME="Test-Secret-v7"
 SECRET_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12)
 SECRET_USERNAME="admin"
 # RDS Identifier and Tags
 RDS_IDENTIFIER="Inventory-DB"
 RDS_NAME_TAG="Inventory-DB"
 ENVIRONMENT="Dev"
-SAMPLE_DUMP_FILE="sample.sql"
 
 # Load Balancer and Target Group
 LB_NAME="Inventory-Server-LB"
@@ -183,7 +183,7 @@ phase1() {
         execute_command "PUB_SUBNET1=\$(aws ec2 create-subnet \
             --vpc-id \"$VPC_ID\" \
             --cidr-block \"$PUB_SUBNET1_CIDR\" \
-            --availability-zone us-east-1a \
+            --availability-zone $AVAILABILITY_ZONE1 \
             --query 'Subnet.SubnetId' \
             --output text)" \
             "Failed to create Public Subnet 1."
@@ -202,7 +202,7 @@ phase1() {
         execute_command "PUB_SUBNET2=\$(aws ec2 create-subnet \
             --vpc-id \"$VPC_ID\" \
             --cidr-block \"$PUB_SUBNET2_CIDR\" \
-            --availability-zone us-east-1b \
+            --availability-zone $AVAILABILITY_ZONE2 \
             --query 'Subnet.SubnetId' \
             --output text)" \
             "Failed to create Public Subnet 2."
@@ -221,7 +221,7 @@ phase1() {
         execute_command "PRIV_SUBNET1=\$(aws ec2 create-subnet \
             --vpc-id \"$VPC_ID\" \
             --cidr-block \"$PRIV_SUBNET1_CIDR\" \
-            --availability-zone us-east-1a \
+            --availability-zone $AVAILABILITY_ZONE1 \
             --query 'Subnet.SubnetId' \
             --output text)" \
             "Failed to create Private Subnet 1."
@@ -240,7 +240,7 @@ phase1() {
         execute_command "PRIV_SUBNET2=\$(aws ec2 create-subnet \
             --vpc-id \"$VPC_ID\" \
             --cidr-block \"$PRIV_SUBNET2_CIDR\" \
-            --availability-zone us-east-1b \
+            --availability-zone $AVAILABILITY_ZONE2 \
             --query 'Subnet.SubnetId' \
             --output text)" \
             "Failed to create Private Subnet 2."
@@ -259,7 +259,7 @@ phase1() {
         execute_command "DB_SUBNET1=\$(aws ec2 create-subnet \
             --vpc-id \"$VPC_ID\" \
             --cidr-block \"$DB_SUBNET1_CIDR\" \
-            --availability-zone us-east-1a \
+            --availability-zone $AVAILABILITY_ZONE1 \
             --query 'Subnet.SubnetId' \
             --output text)" \
             "Failed to create DB Subnet 1."
@@ -278,7 +278,7 @@ phase1() {
         execute_command "DB_SUBNET2=\$(aws ec2 create-subnet \
             --vpc-id \"$VPC_ID\" \
             --cidr-block \"$DB_SUBNET2_CIDR\" \
-            --availability-zone us-east-1b \
+            --availability-zone $AVAILABILITY_ZONE2 \
             --query 'Subnet.SubnetId' \
             --output text)" \
             "Failed to create DB Subnet 2."
@@ -859,7 +859,7 @@ phase2() {
             --storage-type gp3 \
             --allocated-storage 20 \
             --engine mysql \
-            --availability-zone us-east-1a \
+            --availability-zone $AVAILABILITY_ZONE1 \
             --master-username $SECRET_USERNAME \
             --master-user-password $SECRET_PASSWORD \
             --vpc-security-group-ids "$RDS_SG" \
@@ -940,7 +940,7 @@ EOF
             "Failed to create EC2-v2 image."
         status=$?
     fi
-    
+
     RDS_MODIFY=$(aws rds modify-db-instance \
         --db-instance-identifier "$RDS_INSTANCE" \
         --multi-az \
