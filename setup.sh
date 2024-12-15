@@ -833,6 +833,7 @@ phase2() {
         execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances \
             --image-id \"$AMI_ID\" \
             --count 1 \
+            --no-multi-az \
             --instance-type t2.micro \
             --key-name \"$PRIV_KEY\" \
             --security-group-ids \"$LAB_SG\" \
@@ -884,19 +885,30 @@ phase2() {
             "Failed to retrieve RDS MySQL endpoint."
         status=$?
     fi
-
-# Step 1: Login, export a database instance, and copy the dump to the Cloud9 instance
+    if [[ $status -eq 0 ]]; then
+        execute_command "NEW_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances \
+            --instance-ids "$NEW_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)" \
+            "Failed to retrieve new EC2 instance public IP."
+    fi
+    if [[ $status -eq 0 ]]; then
+        execute_command "NEW_INSTANCE_PRIVATE_IP=$(aws ec2 describe-instances \
+            --instance-ids "$NEW_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+            --output text)" \
+            "Failed to retrieve new EC2 instance private IP."
+    fi
+# Step 1: Login to the EC2 instance v1 and export the database
 echo '############################################################################################################'
 ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP << 'EOF' # Login to instance 1
 echo '----------------------------------------------------------------------------------------------------------------'
 mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
 echo '----------------------------------------------------------------------------------------------------------------'
-EOF
+EOF # Step 2: Copy the dump to the Cloud9 instance
 scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql # Copy the dump to the Cloud9 instance
 echo '############################################################################################################'
-
-
-# Step 2: Login, copy the dump to the new instance, and import the dump into the database
+# Step 4: Login to the EC2 instance v2
 ssh -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP << 'EOF' # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
 mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD -e 'CREATE DATABASE STUDENTS' # Create the database
@@ -904,27 +916,17 @@ echo '--------------------------------------------------------------------------
 mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD STUDENTS < $SCRIPT_DIR/$DEFAULT_DB_FILE
 echo '############################################################################################################'
 EOF
+# Step 5: Copy the SQL dump from Cloud9 to the EC2 instance v2
+scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP:/tmp/data.sql ./data.sql
 
-# Step 2: Copy the SQL dump from instance 1 to the source directory on Cloud9
-scp -i ./Public-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@<REMOTE_INSTANCE_1_PUBLIC_IP>:/tmp/data.sql ./data.sql
-
-# Step 3: Create the "STUDENTS" database on RDS via remote instance 2
-ssh -i ./Private-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@192.168.1.230 << 'EOF'
-echo 'Creating STUDENTS database on the RDS instance...'
-mysql -h inventory-db.choq2jj89uyi.us-east-1.rds.amazonaws.com -u admin -p0yNjVaYA0DLU -e 'CREATE DATABASE STUDENTS;'
-echo 'Database STUDENTS created successfully.'
-EOF
-
-# Step 4: Copy the dump from Cloud9 to remote instance 2
-scp -i ./Private-EC2-KeyPair.pem -o StrictHostKeyChecking=no ./data.sql ubuntu@192.168.1.230:/tmp/data.sql
-
-# Step 5: Push the dump from remote instance 2 to the RDS database
-ssh -i ./Private-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@192.168.1.230 << 'EOF'
-echo 'Importing the SQL dump into the STUDENTS database...'
-mysql -h inventory-db.choq2jj89uyi.us-east-1.rds.amazonaws.com -u admin -p0yNjVaYA0DLU STUDENTS < /tmp/data.sql
-echo 'Data successfully imported into the STUDENTS database.'
-EOF
-
+    RDS_MODIFY=$(aws rds modify-db-instance \
+        --db-instance-identifier "$RDS_INSTANCE" \
+        --multi-az \
+        --db-subnet-group "$DBSubnetGroup" \
+        --apply-immediately \
+        --backup-retention-period 1 \
+        --output text)
+        
     if [[ $status -eq 0 ]]; then
         echo "Creating EC2-v2 image..."
         execute_command "SERVER_V2_IMAGE_ID=\$(aws ec2 create-image \
@@ -936,13 +938,7 @@ EOF
         status=$?
     fi
 
-    RDS_MODIFY=$(aws rds modify-db-instance \
-        --db-instance-identifier "$RDS_INSTANCE" \
-        --multi-az \
-        --db-subnet-group "$DBSubnetGroup" \
-        --apply-immediately \
-        --backup-retention-period 1 \
-        --output text)
+
 
     if [[ $status -eq 0 ]]; then
         echo "Image created with ID: $SERVER_V1_IMAGE_ID"
@@ -954,14 +950,6 @@ EOF
             --output text)" \
             "Failed to terminate EC2-v1 instance."
         status=$?
-    fi
-
-    if [[ $status -eq 0 ]]; then
-        execute_command "NEW_INSTANCE_PUBLIC_IP=$(aws ec2 describe-instances \
-            --instance-ids "$NEW_INSTANCE_ID" \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text)" \
-            "Failed to retrieve new EC2 instance public IP."
     fi
 
     if [[ $status -eq 0 ]]; then
