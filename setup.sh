@@ -859,14 +859,20 @@ phase2() {
         execute_command "mysql -h $RDS_ENDPOINT \
             -u $RDS_USERNAME \
             -p$RDS_PASSWORD \
-            -e "CREATE DATABASE STUDENTS;
-            mysql -h "$RDS_ENDPOINT" \
-                -u $SECRET_USERNAME \
-                -p$SECRET_PASSWORD STUDENTS < SCRIPT_DIR/data.sql" \
+            -e 'CREATE DATABASE STUDENTS'" \
             "Failed to migrate data to RDS MySQL instance."
         status=$?
     fi
 
+    if [[ $status -eq 0 ]]; then
+        execute_command "mysql -h $RDS_ENDPOINT \
+            -u $RDS_USERNAME \
+            -p$RDS_PASSWORD \
+            STUDENTS < $SCRIPT_DIR/data.sql" \
+            "Failed to migrate data to RDS MySQL instance."
+        status=$?
+    fi
+    
     if [[ $status -eq 0 ]]; then
         echo "Creating EC2-v2 image..."
         execute_command "SERVER_V2_IMAGE_ID=\$(aws ec2 create-image \
