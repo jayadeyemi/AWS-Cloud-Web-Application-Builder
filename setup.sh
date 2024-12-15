@@ -26,8 +26,6 @@ CLOUD9_SG=$(aws ec2 describe-instances \
     --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
     --output text)
 
-
-
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
 CLOUD9_IP=$CLOUD9_PRIVATE_IP_INPUT
