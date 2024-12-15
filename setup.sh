@@ -61,7 +61,7 @@ EC2_IMAGE1_NAME="Lab-Server-v1-Image"
 EC2_IMAGE2_NAME="Lab-Server-v2-Image"
 
 # Secrets Manager Name
-SECRET_NAME="Test-Secret-v5"
+SECRET_NAME="Test-Secret-v6"
 SECRET_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12)
 SECRET_USERNAME="admin"
 # RDS Identifier and Tags
