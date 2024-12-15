@@ -1,51 +1,42 @@
 #!/bin/bash
-######################################
-# Predefined Static Variables for All Resources
-######################################
 
-# Prompting for user IPs and Cloud9 Public IPs for security group rules
-USER_PUBLIC_IP_INPUT="68.50.23.166"
-CLOUD9_PRIVATE_IP_INPUT="172.31.61.34"
+# Description: This script is used to create the necessary resources for the Inventory application.
+
+######################################
+# User Inputs
+######################################
+# User Public IP, Cloud9 Private IP
+USER_PUBLIC_IP_INPUT="68.50.23.166" # Change this to your public IP for local SSH access to instances
+
+CLOUD9_INSTANCE_ID="i-09148fc063df1a9c6" # Change this to your Cloud9 instance ARN 
+
+# Obtain the Cloud9 private IP address
+CLOUD9_PRIVATE_IP_INPUT=$(aws ec2 describe-instances \
+    --instance-ids $CLOUD9_INSTANCE_ID \
+    --query 'Reservations[0].Instances[0].PrivateIpAddress' \
+    --output text)
+CLOUD9_SG=$(aws ec2 describe-instances \
+    --instance-ids $CLOUD9_INSTANCE_ID \
+    --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+    --output text)
+
+
+CLOUD9_INSTANCE_ID
 echo "Current User Public IP: $USER_PUBLIC_IP_INPUT"
-echo "Current Private IP: $CLOUD9_PRIVATE_IP_INPUT" 
+echo "Current Cloud9 Private IP: $CLOUD9_PRIVATE_IP_INPUT" 
 
-# Are we changing IPs?
-echo "Do you want to change the User Public IP and Cloud9 Private IP? (Y/N)"
-read -r response
-if [[ "$response" =~ ^[Yy]$ ]]; then
-    echo "Enter the User Public IP(xxx.xxx.xxx.xxx):"
-    read -r USER_PUBLIC_IP_INPUT
-    echo "Enter the Cloud9 Private IP(xxx.xxx.xxx.xxx):"
-    read -r CLOUD9_PRIVATE_IP_INPUT
-fi
-
-# Prompt the user to check if the sample dump file has been modified
-echo "Has the sample dump file (sample.sql) been modified with new entries? (Y/N)"
-read -r response
-
-while true; do
-    echo "Has the sample dump file (sample.sql) been modified with new entries? (Y/N)"
-    read -r response
-    
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        echo "Note: Ensure the sample dump file (sample.sql) has been modified with new entries before proceeding."
-        DEFAULT_DB_FILE="sample_entries.sql"
-        break
-    elif [[ "$response" =~ ^[Nn]$ ]]; then
-        DEFAULT_DB_FILE="data.sql"
-        break
-    else
-        echo "Invalid input. Please enter Y or N."
-    fi
-done
-
-# Display the chosen default file
-echo "The default file is set to: $DEFAULT_DB_FILE"
-sleep 5
+DEFAULT_DB_FILE="sample_entries.sql"
+DEFAULT_DB_FILE="data.sql"
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
 CLOUD9_IP=$CLOUD9_PRIVATE_IP_INPUT
+
+
+######################################
+# Predefined Static Variables for All Resources
+######################################
+
 # VPC and Subnet Names
 VPC_NAME="Inventory-VPC"
 PUB_SUBNET1_NAME="Inventory-Public-Subnet1"
@@ -655,6 +646,16 @@ phase1() {
             --cidr "$CLOUD9_IP/32" 2>&1)
         status=$?
     fi
+    
+    if [[ $status -eq 0 ]]; then
+        AUTH_SECURITY_GROUP=$(aws ec2 authorize-security-group-ingress \
+            --group-id "$CLOUD9_SG" \
+            --protocol tcp \
+            --port 22 \
+            --source-group "$LAB_SG")
+        status=$?
+    fi
+
 
     if [[ $status -eq 0 ]]; then
         echo "Creating and saving EC2-v1 key pair..."
