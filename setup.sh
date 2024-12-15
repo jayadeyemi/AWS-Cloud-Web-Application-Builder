@@ -833,7 +833,6 @@ phase2() {
         execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances \
             --image-id \"$AMI_ID\" \
             --count 1 \
-            --no-multi-az \
             --instance-type t2.micro \
             --key-name \"$PRIV_KEY\" \
             --security-group-ids \"$LAB_SG\" \
@@ -854,7 +853,9 @@ phase2() {
             --db-instance-class db.t3.micro \
             --storage-type gp3 \
             --allocated-storage 20 \
+            --no-multi-az \
             --engine mysql \
+            --db-subnet-group-name "$DBSubnetGroup" \
             --availability-zone $AVAILABILITY_ZONE1 \
             --master-username $SECRET_USERNAME \
             --master-user-password $SECRET_PASSWORD \
@@ -922,11 +923,10 @@ scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE
     RDS_MODIFY=$(aws rds modify-db-instance \
         --db-instance-identifier "$RDS_INSTANCE" \
         --multi-az \
-        --db-subnet-group "$DBSubnetGroup" \
         --apply-immediately \
         --backup-retention-period 1 \
         --output text)
-        
+
     if [[ $status -eq 0 ]]; then
         echo "Creating EC2-v2 image..."
         execute_command "SERVER_V2_IMAGE_ID=\$(aws ec2 create-image \
