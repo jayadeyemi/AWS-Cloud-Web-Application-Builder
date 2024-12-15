@@ -1023,7 +1023,7 @@ phase3() {
 
     if [[ $status -eq 0 ]]; then
         echo " Creating Auto Scaling Group..."
-        execute_command "aws autoscaling create-auto-scaling-group \
+        execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group \
             --auto-scaling-group-name "$EC2_ASG_NAME" \
             --launch-template "$LAUNCH_TEMPLATE_ID" \
             --min-size 2 \
@@ -1032,7 +1032,7 @@ phase3() {
             --target-group-arns "$TG_ARN" \
             --vpc-zone-identifier "$PRIV_SUBNET1,$PRIV_SUBNET2" \
             --load-balancer-names "$LB_NAME" \
-              --target-tracking-configuration file://config.json" \
+              --target-tracking-configuration file://config.json)" \
             "Failed to create Auto Scaling Group."
         status=$?
     fi
@@ -1104,7 +1104,7 @@ phase5() {
     done
 
     # Scale down ASG before deletion
-    if [ -n "$EC2_ASG_NAME" ]; then
+    if [ -n "$ASG_GROUP" ]; then
         aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "$EC2_ASG_NAME" \
             --min-size 0 \
