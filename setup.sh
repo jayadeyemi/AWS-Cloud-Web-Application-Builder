@@ -7,7 +7,7 @@
 ############################################################################################################
 # User Public IP, Cloud9 Private IP
 USER_PUBLIC_IP_INPUT="68.50.23.166" # Change this to your public IP for local SSH access to instances
-CLOUD9_INSTANCE_ID="i-09148fc063df1a9c6" # Change this to your Cloud9 instance ARN
+CLOUD9_INSTANCE_ID="i-00df5a3e4e41ca614" # Change this to your Cloud9 instance ARN
 # Availability Zones 
 AVAILABILITY_ZONE1="us-east-1a" # Change this to your preferred availability zone
 AVAILABILITY_ZONE2="us-east-1b" # Change this to your preferred availability zone
