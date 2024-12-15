@@ -11,9 +11,13 @@ CLOUD9_INSTANCE_ID="i-09148fc063df1a9c6" # Change this to your Cloud9 instance A
 # Availability Zones 
 AVAILABILITY_ZONE1="us-east-1a" # Change this to your preferred availability zone
 AVAILABILITY_ZONE2="us-east-1b" # Change this to your preferred availability zone
+# Select whether to use a sample database or the 
+DEFAULT_DB_FILE="sample_entries.sql" # Modify this file's entries if you want to use it.
+# DEFAULT_DB_FILE="data.sql"
 ############################################################################################################
 
 #Using CLOUD9_PRIVATE_IP_INPUT to get the Cloud9 Details
+CLOUD9_PRIVATE_IP_INPUT=$(aws ec2 describe-instances \
     --instance-ids $CLOUD9_INSTANCE_ID \
     --query 'Reservations[0].Instances[0].PrivateIpAddress' \
     --output text)
@@ -23,17 +27,10 @@ CLOUD9_SG=$(aws ec2 describe-instances \
     --output text)
 
 
-CLOUD9_INSTANCE_ID
-echo "Current User Public IP: $USER_PUBLIC_IP_INPUT"
-echo "Current Cloud9 Private IP: $CLOUD9_PRIVATE_IP_INPUT" 
-
-DEFAULT_DB_FILE="sample_entries.sql"
-# DEFAULT_DB_FILE="data.sql"
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
 CLOUD9_IP=$CLOUD9_PRIVATE_IP_INPUT
-
 
 ######################################
 # Predefined Static Variables for All Resources
