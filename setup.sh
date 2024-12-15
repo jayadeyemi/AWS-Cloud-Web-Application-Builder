@@ -958,11 +958,9 @@ echo '##########################################################################
     fi
 
     if [[ $status -eq 0 ]]; then
-        execute_command "TERMINATED_INSTANCE=/$(aws ec2 terminate-instances \
+        TERMINATED_INSTANCE=$(aws ec2 terminate-instances \
             --instance-ids "$INSTANCE_ID" \
-            --output text)" \
-            "Failed to terminate EC2-v1 instance."
-        status=$?
+            --output text)
     fi
 
     if [[ $status -eq 0 ]]; then
