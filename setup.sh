@@ -26,7 +26,7 @@ echo "Current User Public IP: $USER_PUBLIC_IP_INPUT"
 echo "Current Cloud9 Private IP: $CLOUD9_PRIVATE_IP_INPUT" 
 
 DEFAULT_DB_FILE="sample_entries.sql"
-DEFAULT_DB_FILE="data.sql"
+# DEFAULT_DB_FILE="data.sql"
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
@@ -54,6 +54,9 @@ PRIV_SUBNET2_CIDR="192.168.4.0/24"
 DB_SUBNET1_CIDR="192.168.5.0/24"
 DB_SUBNET2_CIDR="192.168.6.0/24"
 INTERNET_CIDR="0.0.0.0/0"
+aws configure set region us-east-1
+AVAILABILITY_ZONE1="us-east-1a"
+AVAILABILITY_ZONE2="us-east-1b"
 # Security Group Names
 EC2_SG_NAME="Inventory-Server-SG"
 RDS_SG_NAME="Inventory-DB-SG"
@@ -718,18 +721,18 @@ phase1() {
 
     if [[ $status -eq 0 ]]; then
         echo -e "\n\n\n"
-        echo ######################################
+        echo "######################################"
         echo "# Phase 1 Completed Successfully."
         echo "# You can access the application at http://$INSTANCE_PUBLIC_IP"
         echo "# Please wait for the instance to be ready."
         echo "# Insert data into the application DB on the web page"
-        echo ######################################
+        echo "######################################"
     else
         echo -e "\n\n\n"
-        echo ######################################
+        echo "######################################"
         echo "# Phase 1 Failed: Please check the last error message above."
         echo "# Please check log files dumped in the Cloud9 directory for more information."
-        echo ######################################
+        echo "######################################"
     fi
 
 }
@@ -740,11 +743,11 @@ phase1() {
 
 phase2() {    
     echo -e "\n\n\n"
-    echo ######################################
+    echo "######################################"
     echo "# Starting Phase 2: Migration to RDS"
     echo "# version #2 Application Launch for communication with RDS"
     echo "# Server v1 image backup and termination"
-    echo ######################################
+    echo "######################################"
 
     # Initialize status variable to track failures
     local status=0
@@ -856,18 +859,19 @@ phase2() {
             --storage-type gp3 \
             --allocated-storage 20 \
             --engine mysql \
+            --availability-zone us-east-1a \
             --master-username $SECRET_USERNAME \
             --master-user-password $SECRET_PASSWORD \
             --vpc-security-group-ids "$RDS_SG" \
-            --db-subnet-group "$DBSubnetGroup" \
             --backup-retention-period 1 \
-            --multi-az \
             --no-enable-performance-insights \
             --query 'DBInstance.DBInstanceIdentifier' \
             --output text)" \
             "Failed to create RDS MySQL instance."
         status=$?
     fi
+
+
 
     if [[ $status -eq 0 ]]; then
         execute_command "aws rds wait db-instance-available \
@@ -885,31 +889,46 @@ phase2() {
             "Failed to retrieve RDS MySQL endpoint."
         status=$?
     fi
-    
-ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP << 'EOF'
-echo 'Dumping MySQL database...'
-mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
-echo 'Database dump completed on the remote instance.'
+
+# Step 1: Login, export a database instance, and copy the dump to the Cloud9 instance
+echo '############################################################################################################'
+ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP << 'EOF' # Login to instance 1
+echo '----------------------------------------------------------------------------------------------------------------'
+mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
+echo '----------------------------------------------------------------------------------------------------------------'
 EOF
-scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql
+scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql # Copy the dump to the Cloud9 instance
+echo '############################################################################################################'
 
-    if [[ $status -eq 0 ]]; then
-        execute_command "mysql -h $RDS_ENDPOINT \
-            -u $RDS_USERNAME \
-            -p$RDS_PASSWORD \
-            -e 'CREATE DATABASE STUDENTS'" \
-            "Failed to migrate data to RDS MySQL instance."
-        status=$?
-    fi
 
-    if [[ $status -eq 0 ]]; then
-        execute_command "mysql -h $RDS_ENDPOINT \
-            -u $RDS_USERNAME \
-            -p$RDS_PASSWORD \
-            STUDENTS < $SCRIPT_DIR/$DEFAULT_DB_FILE" \
-            "Failed to migrate data to RDS MySQL instance."
-        status=$?
-    fi
+# Step 2: Login, copy the dump to the new instance, and import the dump into the database
+ssh -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP << 'EOF' # Login to instance 2
+echo '----------------------------------------------------------------------------------------------------------------'
+mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD -e 'CREATE DATABASE STUDENTS' # Create the database
+echo '----------------------------------------------------------------------------------------------------------------'
+mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD STUDENTS < $SCRIPT_DIR/$DEFAULT_DB_FILE
+echo '############################################################################################################'
+EOF
+
+# Step 2: Copy the SQL dump from instance 1 to the source directory on Cloud9
+scp -i ./Public-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@<REMOTE_INSTANCE_1_PUBLIC_IP>:/tmp/data.sql ./data.sql
+
+# Step 3: Create the "STUDENTS" database on RDS via remote instance 2
+ssh -i ./Private-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@192.168.1.230 << 'EOF'
+echo 'Creating STUDENTS database on the RDS instance...'
+mysql -h inventory-db.choq2jj89uyi.us-east-1.rds.amazonaws.com -u admin -p0yNjVaYA0DLU -e 'CREATE DATABASE STUDENTS;'
+echo 'Database STUDENTS created successfully.'
+EOF
+
+# Step 4: Copy the dump from Cloud9 to remote instance 2
+scp -i ./Private-EC2-KeyPair.pem -o StrictHostKeyChecking=no ./data.sql ubuntu@192.168.1.230:/tmp/data.sql
+
+# Step 5: Push the dump from remote instance 2 to the RDS database
+ssh -i ./Private-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@192.168.1.230 << 'EOF'
+echo 'Importing the SQL dump into the STUDENTS database...'
+mysql -h inventory-db.choq2jj89uyi.us-east-1.rds.amazonaws.com -u admin -p0yNjVaYA0DLU STUDENTS < /tmp/data.sql
+echo 'Data successfully imported into the STUDENTS database.'
+EOF
 
     if [[ $status -eq 0 ]]; then
         echo "Creating EC2-v2 image..."
@@ -921,6 +940,14 @@ scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRI
             "Failed to create EC2-v2 image."
         status=$?
     fi
+    
+    RDS_MODIFY=$(aws rds modify-db-instance \
+        --db-instance-identifier "$RDS_INSTANCE" \
+        --multi-az \
+        --db-subnet-group "$DBSubnetGroup" \
+        --apply-immediately \
+        --backup-retention-period 1 \
+        --output text)
 
     if [[ $status -eq 0 ]]; then
         echo "Image created with ID: $SERVER_V1_IMAGE_ID"
@@ -944,20 +971,20 @@ scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRI
 
     if [[ $status -eq 0 ]]; then
         echo -e "\n\n\n"
-        echo ######################################
+        echo "######################################"
         echo "# Phase 2 Complete: EC2-v2 Public IP - $NEW_INSTANCE_PUBLIC_IP"
         echo "# Please wait 5 minutes for the web application to be fully operational."
         echo "# You can access the application at http://$NEW_INSTANCE_PUBLIC_IP"
         echo "# The instance needs to be fully operational before proceeding to Phase 3."
         # echo "RDS Endpoint - $RDS_ENDPOINT"
         # echo "# EC2-v2 Image ID - $SERVER_V2_IMAGE_ID"
-        echo ######################################
+        echo "######################################"
     else
         echo -e "\n\n\n"
-        echo ######################################
+        echo "######################################"
         echo "# Phase 2 Failed: Please check the last error message above."
         echo "# Please check log files dumped in the Cloud9 directory for more information."
-        echo ######################################
+        echo "######################################"
     fi
 }
 
@@ -967,9 +994,9 @@ scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRI
 
 phase3() {
     echo -e "\n\n\n"
-    echo ######################################
+    echo "######################################"
     echo "# Starting Phase 3: Load Balancer and Auto Scaling Setup"
-    echo ######################################
+    echo "######################################"
     # Initialize status variable to track failures
     local status=0
 
