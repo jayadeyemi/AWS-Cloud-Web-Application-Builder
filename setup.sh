@@ -906,19 +906,32 @@ ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRI
 echo '----------------------------------------------------------------------------------------------------------------'
 mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
 echo '----------------------------------------------------------------------------------------------------------------'
-EOF # Step 2: Copy the dump to the Cloud9 instance
-scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql # Copy the dump to the Cloud9 instance
+EOF 
 echo '############################################################################################################'
-# Step 4: Login to the EC2 instance v2
+
+# Step 2: Copy the dump from the EC2 instance v1 to the Cloud9 instance
+scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/$DEFAULT_DB_FILE 
+
+# Step 3: Login to the EC2 instance v2 and create the database 
+echo '############################################################################################################'
 ssh -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP << 'EOF' # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
 mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD -e 'CREATE DATABASE STUDENTS' # Create the database
 echo '----------------------------------------------------------------------------------------------------------------'
-mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD STUDENTS < $SCRIPT_DIR/$DEFAULT_DB_FILE
-echo '############################################################################################################'
 EOF
-# Step 5: Copy the SQL dump from Cloud9 to the EC2 instance v2
-scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP:/tmp/data.sql ./data.sql
+echo '############################################################################################################'
+
+# Step 4: Copy the SQL Dump to the Cloud9 instance
+scp -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql # Copy the dump to the Cloud9 instance
+
+# Step 5: Login to the ec2 instance v2 and export the database to RDS
+echo '############################################################################################################'
+ssh -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE_PRIVATE_IP << 'EOF' # Login to instance 2
+echo '----------------------------------------------------------------------------------------------------------------'
+mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD STUDENTS < $SCRIPT_DIR/$DEFAULT_DB_FILE
+echo '----------------------------------------------------------------------------------------------------------------'
+EOF
+echo '############################################################################################################'
 
     RDS_MODIFY=$(aws rds modify-db-instance \
         --db-instance-identifier "$RDS_INSTANCE" \
@@ -946,7 +959,7 @@ scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$NEW_INSTANCE
 
     if [[ $status -eq 0 ]]; then
         execute_command "TERMINATED_INSTANCE=/$(aws ec2 terminate-instances \
-            --instance-ids \"$INSTANCE_ID\" \
+            --instance-ids "$INSTANCE_ID" \
             --output text)" \
             "Failed to terminate EC2-v1 instance."
         status=$?
@@ -997,9 +1010,9 @@ phase3() {
 
     if [[ $status -eq 0 ]]; then
         execute_command "LB_SG=\$(aws ec2 create-security-group \
-            --group-name \"$LB_SG_NAME\" \
+            --group-name "$LB_SG_NAME" \
             --description \"Load Balancer Security Group\" \
-            --vpc-id \"$VPC_ID\" \
+            --vpc-id "$VPC_ID" \
             --query 'GroupId' \
             --output text)" \
             "Failed to create Load Balancer Security Group."
