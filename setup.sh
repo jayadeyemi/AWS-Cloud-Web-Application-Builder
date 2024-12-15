@@ -1148,7 +1148,6 @@ phase5() {
             --min-size 0 \
             --desired-capacity 0 || true
         check_command_success "Scaling down Auto Scaling Group"
-        sleep 60
     fi
 
     # Terminate EC2 instances
@@ -1157,8 +1156,6 @@ phase5() {
             aws ec2 terminate-instances \
                 --instance-ids "$instance_id" \
                 --output text || true
-            aws ec2 wait instance-terminated \
-                --instance-ids "$instance_id" || true
             check_command_success "Terminating EC2 instance $instance_id"
         fi
     done
@@ -1188,8 +1185,6 @@ phase5() {
         aws rds delete-db-instance \
             --db-instance-identifier "$RDS_IDENTIFIER" \
             --skip-final-snapshot > /dev/null 2>&1
-        aws rds wait db-instance-deleted \
-            --db-instance-identifier "$RDS_IDENTIFIER"
         check_command_success "Deleting RDS instance"
     fi
 
