@@ -1227,7 +1227,6 @@ phase5() {
             --force-delete
         check_command_success "Deleting Auto Scaling Group"
     fi
-
     # list all ingress rules for the Cloud9 security group
    for sg_id in "LAB_SG" "RDS_SG" "LB_SG"; do
         rule_ids=$(aws ec2 describe-security-group-rules \
@@ -1235,23 +1234,8 @@ phase5() {
             --query 'SecurityGroupRules[?(IsEgress=="false")].SecurityGroupRuleId ' \
             --output text)
         revoke_command="aws ec2 revoke-security-group-ingress --group-id $CLOUD9_SG --security-group-rule-ids"
-    do
-
-        if [ -n "$rule_ids" ]; then
-            for rule in $rule_ids; do
-                # Revoke each rule and log the result
-                if aws ec2 revoke-security-group-ingress \
-                    --group-id "$CLOUD9_SG" \
-                    --security-group-rule-ids "$rule" \
-                    --output text; then
-                    echo "Successfully revoked rule $rule from $CLOUD9_SG"
-                else
-                    echo "Failed to revoke rule $rule from $CLOUD9_SG" >&2
-                fi
-            done
-        fi
-    fi
-
+    done
+    # List of security group IDs
     for sg_id in "$LAB_SG" "$RDS_SG" "$LB_SG"; do
         if [[ -n "$sg_id" ]]; then
             echo "Processing Security Group: $sg_id"
