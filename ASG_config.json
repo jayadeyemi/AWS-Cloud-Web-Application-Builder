@@ -1,5 +1,5 @@
 {
-  "TargetValue": 50.0,
+  "TargetValue": 80.0,
   "PredefinedMetricSpecification": {
     "PredefinedMetricType": "ASGAverageCPUUtilization"
   }

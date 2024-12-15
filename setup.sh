@@ -6,18 +6,54 @@
 # Prompting for user IPs and Cloud9 Public IPs for security group rules
 USER_PUBLIC_IP_INPUT="68.50.23.166"
 CLOUD9_PRIVATE_IP_INPUT="172.31.61.34"
+echo "Current User Public IP: $USER_PUBLIC_IP_INPUT"
+echo "Current Private IP: $CLOUD9_PRIVATE_IP_INPUT" 
+
+# Are we changing IPs?
+echo "Do you want to change the User Public IP and Cloud9 Private IP? (Y/N)"
+read -r response
+if [[ "$response" =~ ^[Yy]$ ]]; then
+    echo "Enter the User Public IP(xxx.xxx.xxx.xxx):"
+    read -r USER_PUBLIC_IP_INPUT
+    echo "Enter the Cloud9 Private IP(xxx.xxx.xxx.xxx):"
+    read -r CLOUD9_PRIVATE_IP_INPUT
+fi
+
+# Prompt the user to check if the sample dump file has been modified
+echo "Has the sample dump file (sample.sql) been modified with new entries? (Y/N)"
+read -r response
+
+while true; do
+    echo "Has the sample dump file (sample.sql) been modified with new entries? (Y/N)"
+    read -r response
+    
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+        echo "Note: Ensure the sample dump file (sample.sql) has been modified with new entries before proceeding."
+        DEFAULT_DB_FILE="sample.sql"
+        break
+    elif [[ "$response" =~ ^[Nn]$ ]]; then
+        DEFAULT_DB_FILE="data.sql"
+        break
+    else
+        echo "Invalid input. Please enter Y or N."
+    fi
+done
+
+# Display the chosen default file
+echo "The default file is set to: $DEFAULT_DB_FILE"
+wait 5
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
 CLOUD9_IP=$CLOUD9_PRIVATE_IP_INPUT
 # VPC and Subnet Names
-VPC_NAME="Lab-VPC"
-PUB_SUBNET1_NAME="Lab-Public-Subnet1"
-PUB_SUBNET2_NAME="Lab-Public-Subnet2"
-PRIV_SUBNET1_NAME="Lab-Private-Subnet1"
-PRIV_SUBNET2_NAME="Lab-Private-Subnet2"
-DB_SUBNET1_NAME="Lab-DB-Subnet1"
-DB_SUBNET2_NAME="Lab-DB-Subnet2"
+VPC_NAME="Inventory-VPC"
+PUB_SUBNET1_NAME="Inventory-Public-Subnet1"
+PUB_SUBNET2_NAME="Inventory-Public-Subnet2"
+PRIV_SUBNET1_NAME="Inventory-Private-Subnet1"
+PRIV_SUBNET2_NAME="Inventory-Private-Subnet2"
+DB_SUBNET1_NAME="Inventory-DB-Subnet1"
+DB_SUBNET2_NAME="Inventory-DB-Subnet2"
 # CIDR Blocks
 VPC_CIDR="192.168.0.0/16"
 PUB_SUBNET1_CIDR="192.168.1.0/24"
@@ -28,22 +64,22 @@ DB_SUBNET1_CIDR="192.168.5.0/24"
 DB_SUBNET2_CIDR="192.168.6.0/24"
 INTERNET_CIDR="0.0.0.0/0"
 # Security Group Names
-EC2_SG_NAME="Lab-Server-SG"
-RDS_SG_NAME="Lab-DB-SG"
-LB_SG_NAME="Lab-LB-SG"
+EC2_SG_NAME="Inventory-Server-SG"
+RDS_SG_NAME="Inventory-DB-SG"
+LB_SG_NAME="Inventory-LB-SG"
 # Route Table Names
-PUB_ROUTE_TABLE_NAME="Lab-Public-Route-Table"
-PRIV_ROUTE_TABLE_NAME="Lab-Private-Route-Table"
-DB_ROUTE_TABLE_NAME="Lab-DB-Route-Table"
+PUB_ROUTE_TABLE_NAME="Inventory-Public-Route-Table"
+PRIV_ROUTE_TABLE_NAME="Inventory-Private-Route-Table"
+DB_ROUTE_TABLE_NAME="Inventory-DB-Route-Table"
 # Gateway Tags
-IGW_TAG="Lab-IGW"
-NAT_GW_TAG="Lab-NAT"
-EIP_TAG="Lab-EIP"
+IGW_TAG="Inventory-IGW"
+NAT_GW_TAG="Inventory-NAT"
+EIP_TAG="Inventory-EIP"
 # RDS Subnet Group Name
-DBSubnetGroup="Lab-DB-Subnet-Group"
+DBSubnetGroup="Inventory-DB-Subnet-Group"
 
 # Instance Profile
-INSTANCE_PROFILE_NAME="LabInstanceProfile"
+INVENTORY_SERVER_ROLE="LabInstanceProfile"
 # Ubuntu AMI ID
 AMI_ID="ami-0e2c8caa4b6378d8c"
 # Key Pairs
@@ -55,25 +91,26 @@ USER_DATA_FILE_V1="phase1_userdata.sh"
 USER_DATA_FILE_V2="phase2_userdata.sh"
 ASG_config = "ASG_config.json"  
 # EC2 Instance and Image Names
-EC2_V1_NAME="Lab-Server-v1"
-EC2_V2_NAME="Lab-Server-v2"
-EC2_IMAGE1_NAME="Lab-Server-v1-Image"
-EC2_IMAGE2_NAME="Lab-Server-v2-Image"
+EC2_V1_NAME="Inventory-Server-v1"
+EC2_V2_NAME="Inventory-Server-v2"
+EC2_IMAGE1_NAME="Inventory-Server-v1-Image"
+EC2_IMAGE2_NAME="Inventory-Server-v2-Image"
 
 # Secrets Manager Name
 SECRET_NAME="Test-Secret-v6"
 SECRET_PASSWORD=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 12)
 SECRET_USERNAME="admin"
 # RDS Identifier and Tags
-RDS_IDENTIFIER="Lab-DB"
-RDS_NAME_TAG="Lab-DB"
+RDS_IDENTIFIER="Inventory-DB"
+RDS_NAME_TAG="Inventory-DB"
 ENVIRONMENT="Dev"
+SAMPLE_DUMP_FILE="sample.sql"
 
 # Load Balancer and Target Group
-LB_NAME="Lab-Server-LB"
-TG_NAME="Lab-Server-TG"
+LB_NAME="Inventory-Server-LB"
+TG_NAME="Inventory-Server-TG"
 # Auto Scaling
-EC2_ASG_NAME="Lab-Server-v3-ASG"
+EC2_ASG_NAME="Inventory-Server-v3-ASG"
 ASG_POLICY_NAME="CPU50PercentPolicy"
 LAUNCH_TEMPLATE_NAME="ASG-Launch-Template"
 
@@ -507,7 +544,7 @@ phase1() {
 
     # Retrieve the Default VPC ID
     if [[ $status -eq 0 ]]; then
-        echo "Creating VPC Peering Connection between Default VPC and Lab VPC"
+        echo "Creating VPC Peering Connection between Default VPC and Inventory VPC"
         execute_command "DEFAULT_VPC_ID=\$(aws ec2 describe-vpcs \
             --filters \"Name=isDefault,Values=true\" \
             --query 'Vpcs[0].VpcId' \
@@ -567,7 +604,7 @@ phase1() {
             --route-table-id \"$MAIN_ROUTE_TABLE_ID\" \
             --destination-cidr-block \"$DEFAULT_VPC_CIDR\" \
             --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\"" \
-            "Failed to update Lab VPC route table for peering connection."
+            "Failed to update Inventory VPC route table for peering connection."
         status=$?
     fi
 
@@ -584,7 +621,7 @@ phase1() {
         echo "Creating Security Groups"
         execute_command "LAB_SG=\$(aws ec2 create-security-group \
             --group-name \"$EC2_SG_NAME\" \
-            --description \"Lab Server Security Group\" \
+            --description \"Inventory Server Security Group\" \
             --vpc-id \"$VPC_ID\" \
             --query 'GroupId' \
             --output text)" \
@@ -683,7 +720,8 @@ phase1() {
         echo ######################################
         echo "# Phase 1 Completed Successfully."
         echo "# You can access the application at http://$INSTANCE_PUBLIC_IP"
-        echo "# The instance is fully operational."
+        echo "# Please wait for the instance to be ready."
+        echo "# Insert data into the application DB on the web page"
         echo ######################################
     else
         echo -e "\n\n\n"
@@ -714,7 +752,7 @@ phase2() {
         echo "Creating RDS Subnet Group..."
         execute_command "DB_SUBNET_GROUP_DETAILS=\$(aws rds create-db-subnet-group \
             --db-subnet-group-name \"$DBSubnetGroup\" \
-            --db-subnet-group-description \"Lab RDS Subnet Group\" \
+            --db-subnet-group-description \"Inventory RDS Subnet Group\" \
             --subnet-ids \"$DB_SUBNET1\" \"$DB_SUBNET2\" \
             --output text)" \
             "Failed to create RDS DB Subnet Group." 
@@ -801,6 +839,7 @@ phase2() {
             --security-group-ids \"$LAB_SG\" \
             --subnet-id \"$PUB_SUBNET1\" \
             --user-data file://\"$USER_DATA_FILE_V2\" \
+            --iam-instance-profile Name=$INVENTORY_SERVER_ROLE \
             --query 'Instances[0].InstanceId' \
             --output text)" \
             "Failed to launch EC2-v2 instance."
@@ -845,7 +884,7 @@ phase2() {
         status=$?
     fi
     if [[ $status -eq 0 ]]; then
-        execute_command "ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP <<EOF
+        execute_command "ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP << 'EOF'
             echo 'Dumping MySQL database...'
             mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
             echo 'Database dump completed on the remote instance.'
@@ -868,7 +907,7 @@ phase2() {
         execute_command "mysql -h $RDS_ENDPOINT \
             -u $RDS_USERNAME \
             -p$RDS_PASSWORD \
-            STUDENTS < $SCRIPT_DIR/data.sql" \
+            STUDENTS < $SCRIPT_DIR/$DEFAULT_DB_FILE" \
             "Failed to migrate data to RDS MySQL instance."
         status=$?
     fi
@@ -1192,7 +1231,7 @@ phase5() {
 
             # Fetch all ingress rule IDs for the security group
             rule_ids=$(aws ec2 describe-security-group-rules \
-                --filters Name="group-id",Values="$sg_id" Name="IsEgress",Values="false" \
+                --filters Name="group-id",Values="$sg_id" Name="IsEgress",Values=false \
                 --query 'SecurityGroupRules[*].SecurityGroupRuleId' \
                 --output text)
 
