@@ -646,7 +646,7 @@ phase1() {
             --cidr "$CLOUD9_IP/32" 2>&1)
         status=$?
     fi
-    
+
     if [[ $status -eq 0 ]]; then
         AUTH_SECURITY_GROUP=$(aws ec2 authorize-security-group-ingress \
             --group-id "$CLOUD9_SG" \
@@ -841,6 +841,7 @@ phase2() {
             --subnet-id \"$PUB_SUBNET1\" \
             --user-data file://\"$USER_DATA_FILE_V2\" \
             --iam-instance-profile Name=$INVENTORY_SERVER_ROLE \
+            --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$EC2_V1_NAME}]\" \
             --query 'Instances[0].InstanceId' \
             --output text)" \
             "Failed to launch EC2-v2 instance."
@@ -884,16 +885,13 @@ phase2() {
             "Failed to retrieve RDS MySQL endpoint."
         status=$?
     fi
-    if [[ $status -eq 0 ]]; then
-        execute_command "ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP << 'EOF'
-            echo 'Dumping MySQL database...'
-            mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
-            echo 'Database dump completed on the remote instance.'
-            EOF
-            scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
-        "Failed to migrate MySQL data to Cloud9 instance."
-        status=$?
-    fi
+    
+ssh -i ./Public-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@$ << 'EOF'
+echo 'Dumping MySQL database...'
+mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
+echo 'Database dump completed on the remote instance.'
+EOF
+scp -i ./Public-EC2-KeyPair.pem -o StrictHostKeyChecking=no ubuntu@192.168.1.45:/tmp/data.sql ./data.sql
 
     if [[ $status -eq 0 ]]; then
         execute_command "mysql -h $RDS_ENDPOINT \
