@@ -845,12 +845,12 @@ phase2() {
         status=$?
     fi
     if [[ $status -eq 0 ]]; then
-        execute_command "ssh -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PUBLIC_IP << EOF
+        execute_command "ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP <<EOF
             echo 'Dumping MySQL database...'
             mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
             echo 'Database dump completed on the remote instance.'
             EOF
-            scp \-i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
+            scp -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
         "Failed to migrate MySQL data to Cloud9 instance."
         status=$?
     fi
@@ -1192,7 +1192,7 @@ phase5() {
 
             # Fetch all ingress rule IDs for the security group
             rule_ids=$(aws ec2 describe-security-group-rules \
-                --filters Name="group-id",Values="$sg_id" Name="egress",Values="false" \
+                --filters Name="group-id",Values="$sg_id" Name="IsEgress",Values="false" \
                 --query 'SecurityGroupRules[*].SecurityGroupRuleId' \
                 --output text)
 
