@@ -29,7 +29,7 @@ while true; do
     
     if [[ "$response" =~ ^[Yy]$ ]]; then
         echo "Note: Ensure the sample dump file (sample.sql) has been modified with new entries before proceeding."
-        DEFAULT_DB_FILE="sample.sql"
+        DEFAULT_DB_FILE="sample_entries.sql"
         break
     elif [[ "$response" =~ ^[Nn]$ ]]; then
         DEFAULT_DB_FILE="data.sql"
@@ -41,7 +41,8 @@ done
 
 # Display the chosen default file
 echo "The default file is set to: $DEFAULT_DB_FILE"
-wait 5
+# wait 5
+sleep 5
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
@@ -89,7 +90,7 @@ PRIV_KEY="Private-EC2-KeyPair"
 SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 USER_DATA_FILE_V1="phase1_userdata.sh"
 USER_DATA_FILE_V2="phase2_userdata.sh"
-ASG_config = "ASG_config.json"  
+ASG_config="ASG_config.json"  
 # EC2 Instance and Image Names
 EC2_V1_NAME="Inventory-Server-v1"
 EC2_V2_NAME="Inventory-Server-v2"
