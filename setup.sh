@@ -5,7 +5,7 @@
 
 # Prompting for user IPs and Cloud9 Public IPs for security group rules
 USER_PUBLIC_IP_INPUT="68.50.23.166"
-CLOUD9_PRIVATE_IP_INPUT="172.31.25.86"
+CLOUD9_PRIVATE_IP_INPUT="172.31.61.34"
 
 # Defining variables for IPs
 USER_IP=$USER_PUBLIC_IP_INPUT
