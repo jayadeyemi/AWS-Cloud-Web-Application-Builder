@@ -845,12 +845,12 @@ phase2() {
         status=$?
     fi
     if [[ $status -eq 0 ]]; then
-        execute_command "ssh -i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP <<EOF
+        execute_command "ssh -i $SCRIPT_DIR/$PRIV_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PUBLIC_IP << EOF
             echo 'Dumping MySQL database...'
             mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql
             echo 'Database dump completed on the remote instance.'
             EOF
-            scp \-i $PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
+            scp \-i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRIVATE_IP:/tmp/data.sql $SCRIPT_DIR/data.sql" \
         "Failed to migrate MySQL data to Cloud9 instance."
         status=$?
     fi
@@ -872,7 +872,7 @@ phase2() {
             "Failed to migrate data to RDS MySQL instance."
         status=$?
     fi
-    
+
     if [[ $status -eq 0 ]]; then
         echo "Creating EC2-v2 image..."
         execute_command "SERVER_V2_IMAGE_ID=\$(aws ec2 create-image \
