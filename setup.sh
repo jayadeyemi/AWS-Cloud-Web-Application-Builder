@@ -1230,8 +1230,8 @@ phase5() {
 
             # Fetch all ingress rule IDs for the security group
             rule_ids=$(aws ec2 describe-security-group-rules \
-                --filters Name="group-id",Values="$sg_id" Name="IsEgress",Values=false \
-                --query 'SecurityGroupRules[*].SecurityGroupRuleId' \
+                --filters Name="group-id",Values="$sg_id" \
+                --query 'SecurityGroupRules[?(IsEgress=="false")].SecurityGroupRuleId' \
                 --output text)
 
             if [[ -n "$rule_ids" ]]; then
@@ -1271,7 +1271,6 @@ phase5() {
         aws ec2 wait nat-gateway-deleted \
             --nat-gateway-ids "$NAT_GW_ID" || true
         check_command_success "Deleting NAT Gateway"
-        sleep 60
     fi
 
     echo "Releasing Elastic IP..."
