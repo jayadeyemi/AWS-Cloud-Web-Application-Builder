@@ -111,7 +111,7 @@ prompt_phase() {
         if [[ "$cont" == "yes" ]]; then
             log "$EXECUTION_LOG" "Executing Phase ${phase_num} (${phase_name})..."
             source "$phase_file"
-            if mycmd; then
+            if [[ $? -ne 0 ]]; then
                 log "$EXECUTION_LOG" "Phase ${phase_num} failed. Jumping to Phase 5..."
                 source "$(dirname "$0")/phase5.sh"
                 return 1
