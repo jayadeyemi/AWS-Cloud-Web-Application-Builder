@@ -98,7 +98,7 @@ prompt_phase() {
     local phase_name=$3
 
     while true; do
-        read -t 300 -p "Proceed to Phase ${phase_num} (${phase_name})? (yes/exit/[Press Enter to skip]): " cont
+        read -t 300 -r -p "Proceed to Phase ${phase_num} (${phase_name})? (yes/exit/[Press Enter to skip]): " cont
         cont="${cont,,}"
 
         if [[ "$cont" == "yes" ]]; then
@@ -152,6 +152,5 @@ while true; do
 
     if [[ "$repeat" == "no" ]]; then
         log "$EXECUTION_LOG" "Exiting the script."
-        exit 0
     fi
 done

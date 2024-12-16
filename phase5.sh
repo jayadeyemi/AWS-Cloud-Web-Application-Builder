@@ -90,11 +90,27 @@ phase5() {
         aws autoscaling delete-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NAME" --force-delete
         check_command_success "Deleting Auto Scaling Group"
     fi
-    # list all ingress rules for the Cloud9 security group
-   for sg_id in "LAB_SG" "RDS_SG" "LB_SG"; do
-        rule_ids=$(aws ec2 describe-security-group-rules --filters Name="group-id",Values="$CLOUD9_SG" Name="ReferencedGroupInfo.group-id",Values="$sg_id" --query 'SecurityGroupRules[?(IsEgress=="false")].SecurityGroupRuleId ' --output text)
-        revoke_command="aws ec2 revoke-security-group-ingress --group-id $CLOUD9_SG --security-group-rule-ids"
-    done
+    # Define the security group IDs
+CLOUD9_SG="your-cloud9-sg-id" # Replace with your actual Cloud9 Security Group ID
+
+# List and process ingress rules for the Cloud9 security group
+for sg_id in "LAB_SG" "RDS_SG" "LB_SG"; do
+    # Retrieve ingress rule IDs for the specified security group
+    rule_ids=$(aws ec2 describe-security-group-rules \
+        --filters Name="group-id",Values="$CLOUD9_SG" Name="is-egress",Values="false" \
+        --query "SecurityGroupRules[?GroupId=='$CLOUD9_SG'].SecurityGroupRuleId" \
+        --output text)
+    
+    # Check if there are any rules to revoke
+    if [[ -n "$rule_ids" ]]; then
+        # Revoke the ingress rules
+        aws ec2 revoke-security-group-ingress --group-id "$CLOUD9_SG" --security-group-rule-ids $rule_ids
+        echo "Revoked ingress rules: $rule_ids for security group $CLOUD9_SG"
+    else
+        echo "No ingress rules found for security group $CLOUD9_SG"
+    fi
+done
+
 
     # List of security group IDs
     for sg_id in "$EC2_V1_SG_NAME" "$RDS_SG" "$LB_SG"; do
