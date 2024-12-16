@@ -70,29 +70,34 @@ execute_command() {
         if [[ -n "$output_var" ]]; then
             response=$(eval "$actual_command" 2>&1)
             status=$?
-            [[ $status -eq 0 ]] && eval "$output_var=\"\$response\"" && store_variable "$output_var"
+            if [[ $status -eq 0 ]]; then
+                eval "$output_var=\"\$response\""
+                store_variable "$output_var"
+                log "$EXECUTION_LOG" "Command_ID=$command_id succeeded."
+                return 0
+            fi
         else
             response=$(eval "$actual_command" 2>&1)
             status=$?
+            if [[ $status -eq 0 ]]; then
+                log "$EXECUTION_LOG" "Command_ID=$command_id succeeded."
+                return 0
+            fi
         fi
 
         # Log response and status
         log "$RESPONSE_LOG" "Command_ID=$command_id Response: $response"
         log "$RESPONSE_LOG" "Command_ID=$command_id Status: $status"
 
-        if [[ $status -eq 0 ]]; then
-            log "$EXECUTION_LOG" "Command_ID=$command_id succeeded."
-            return 0
-        else
-            log "$EXECUTION_LOG" "Command_ID=$command_id failed. Retrying ($((retries + 1))/$RETRY_LIMIT)..."
-            sleep $RETRY_INTERVAL
-            ((retries++))
-        fi
+        log "$EXECUTION_LOG" "Command_ID=$command_id failed. Retrying ($((retries + 1))/$RETRY_LIMIT)..."
+        sleep $RETRY_INTERVAL
+        ((retries++))
     done
 
     log "$EXECUTION_LOG" "Command_ID=$command_id failed after $RETRY_LIMIT retries."
     return $status
 }
+
 
 ######################################
 # Phase Execution Wrapper
