@@ -47,7 +47,7 @@ if [[ $status -eq 0 ]]; then
         while [[ (-z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None") && $attempt -lt $MAX_ATTEMPTS ]]; do
             ((attempt++))
             echo "Attempt $attempt of $MAX_ATTEMPTS"
-            read -p -r "Enter the correct Cloud9 instance ID: " CLOUD9_INSTANCE_ID
+            read -p "Enter the correct Cloud9 instance ID: " CLOUD9_INSTANCE_ID
             execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
             status=$?
             if [[ $status -ne 0 ]]; then
