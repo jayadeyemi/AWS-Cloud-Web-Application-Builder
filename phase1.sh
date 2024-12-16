@@ -36,6 +36,30 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+
+# Create a security group for the Cloud9 instance if not found
+if [[ $status -eq 0 ]]; then
+    if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
+    # Assign attempt variables
+    MAX_ATTEMPTS=5
+    attempt=0
+
+        while [[ (-z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None") && $attempt -lt $MAX_ATTEMPTS ]]; do
+            ((attempt++))
+            echo "Attempt $attempt of $MAX_ATTEMPTS"
+            read -p -r "Enter the correct Cloud9 instance ID: " CLOUD9_INSTANCE_ID
+            execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
+            status=$?
+            if [[ $status -ne 0 ]]; then
+                echo "Failed to retrieve security group ID for instance ID: $CLOUD9_INSTANCE_ID. Please try again."
+            fi
+        done
+    fi
+else
+    echo "Error retrieving security group ID for instance ID: $CLOUD9_INSTANCE_ID. Exiting."
+    exit 1
+fi
+
 # echo "###########################################################################################################"
 # echo "# VPC Creation and Subnet Creation"
 # echo "###########################################################################################################"
@@ -324,15 +348,6 @@ fi
 # echo "# Security Group Creation and authorizations"
 # echo "###########################################################################################################"
 
-
-# Create a security group for the Cloud9 instance
-if [[ $status -eq 0 ]]; then
-    if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
-        execute_command "CLOUD9_SG_ID=\$(aws ec2 create-security-group --group-name \"$CLOUD9_SG_NAME\" --description \"Cloud9 Security Group\" --vpc-id \"$DEFAULT_VPC_ID\" --query 'GroupId' --output text)"
-        status=$?
-    fi
-fi
-
 # Create a security group for EC2-V1 instance in the main VPC
 if [[ $status -eq 0 ]]; then
     execute_command "EC2_V1_SG_ID=\$(aws ec2 create-security-group --group-name \"$EC2_V1_SG_NAME\" --description \"Inventory Server Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --output text)"
@@ -353,13 +368,13 @@ fi
 
 # Authorize SSH access to the Cloud9 security group from the EC2-V1 security group
 if [[ $status -eq 0 ]]; then
-    execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id \"$CLOUD9_SG\" --protocol tcp --port 22 --source-group \"$EC2_V1_SG_NAME\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id \"$$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
 # Authorize HTTP access to the EC2-V1 security group from the Internet
 if [[ $status -eq 0 ]]; then
-    execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_NAME\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
@@ -382,7 +397,7 @@ fi
 # Launch the EC2 instance
 if [[ $status -eq 0 ]]; then
     echo "Launching EC2-v1 instance..."
-    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_NAME\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 

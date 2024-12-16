@@ -17,7 +17,7 @@ echo -e "\n\n\n"
 
 # Create Database Subnet Group and attach DB Private Subnets
 if [[ $status -eq 0 ]]; then
-    execute_command "DB_SUBNET_GROUP_DETAILS=\$(aws rds create-db-subnet-group --db-subnet-group-name \"$DBSubnetGroup\" --db-subnet-group-description \"Inventory RDS Subnet Group\" --subnet-ids \"$DB_SUBNET1\" \"$DB_SUBNET2\" --output text)"
+    execute_command "DB_SUBNET_GROUP_DETAILS=\$(aws rds create-db-subnet-group --db-subnet-group-name \"$DG_DUBNET_GROUP_NAME\" --db-subnet-group-description \"Inventory RDS Subnet Group\" --subnet-ids \"$DB_SUBNET1\" \"$DB_SUBNET2\" --output text)"
     status=$?
 fi
 
@@ -35,13 +35,13 @@ fi
 
 # Authorize RDS Security Group access to EC2-v1 Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "EC2_V1_SG_RDS_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_NAME\" --protocol tcp --port 3306 --source-group \"$RDS_SG\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "EC2_V1_SG_RDS_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
 # Authorize EC2-v1 Security Group access to RDS Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "RDS_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG\" --protocol tcp --port 3306 --source-group \"$EC2_V1_SG_NAME\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "RDS_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG_ID\" --protocol tcp --port 3306 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
@@ -69,13 +69,13 @@ fi
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V1_SG_NAME\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=$INVENTORY_SERVER_ROLE --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$EC2_V1_NAME}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=$INVENTORY_SERVER_ROLE --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$EC2_V1_NAME}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 
 # Create a new RDS instance
 if [[ $status -eq 0 ]]; then
-    execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DBSubnetGroup\" --availability-zone $AVAILABILITY_ZONE1 --master-username $SECRET_USERNAME --master-user-password $SECRET_PASSWORD --vpc-security-group-ids \"$RDS_SG\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
+    execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DG_DUBNET_GROUP_NAME\" --availability-zone $AVAILABILITY_ZONE1 --master-username $SECRET_USERNAME --master-user-password $SECRET_PASSWORD --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
     status=$?
 fi
 
