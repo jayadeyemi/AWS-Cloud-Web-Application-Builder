@@ -30,6 +30,12 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+   # Describe the Cloud9 security group
+if [[ $status -eq 0 ]]; then
+    execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
+    status=$?
+fi
+
 # echo "###########################################################################################################"
 # echo "# VPC Creation and Subnet Creation"
 # echo "###########################################################################################################"
@@ -318,16 +324,13 @@ fi
 # echo "# Security Group Creation and authorizations"
 # echo "###########################################################################################################"
 
-   # Describe the Cloud9 security group
-if [[ $status -eq 0 ]]; then
-    execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
-    status=$?
-fi
 
-if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
-        # Retrieve the VPC ID of the Cloud9 instance
-         execute_command "CLOUD9_VPC_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].VpcId' --output text)"
+# Create a security group for the Cloud9 instance
+if [[ $status -eq 0 ]]; then
+    if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
+        execute_command "CLOUD9_SG_ID=\$(aws ec2 create-security-group --group-name \"$CLOUD9_SG_NAME\" --description \"Cloud9 Security Group\" --vpc-id \"$DEFAULT_VPC_ID\" --query 'GroupId' --output text)"
         status=$?
+    fi
 fi
 
 # Create a security group for EC2-V1 instance in the main VPC
