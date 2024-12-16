@@ -113,27 +113,24 @@ done
 
 
 # List of security group IDs
-for sg_id in "$EC2_V1_SG_NAME" "$RDS_SG" "$LB_SG"; do
+for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG"; do
     if [[ -n "$sg_id" ]]; then
         echo "Processing Security Group: $sg_id"
 
         # Fetch all ingress rule IDs for the security group
         rule_ids=$(aws ec2 describe-security-group-rules \
-            --filters Name="group-id",Values="$sg_id"
-            --query 'SecurityGroupRules[?(IsEgress=="false")].SecurityGroupRuleId' \
+            --filters Name="group-id",Values="$sg_id" Name="is-egress",Values="false" \
+            --query "SecurityGroupRules[?GroupId=='$sg_id'].SecurityGroupRuleId" \
             --output text)
 
         # Revoke each rule
         if [[ -n "$rule_ids" ]]; then
             for rule in $rule_ids; do
                 # Revoke each rule and log the result
-                if aws ec2 revoke-security-group-ingress \
-                    --group-id "$sg_id"
-                    --security-group-rule-ids "$rule"
-                    --output text; then
+                if aws ec2 revoke-security-group-ingress --group-id "$sg_id" --security-group-rule-ids "$rule" --output text; then
                     echo "Successfully revoked rule $rule from $sg_id"
                 else
-                    echo "Failed to revoke rule $rule from $sg_id" >&2
+                    echo "Failed to revoke rule $rule from $sg_id" 
                 fi
             done
         else
@@ -144,7 +141,7 @@ for sg_id in "$EC2_V1_SG_NAME" "$RDS_SG" "$LB_SG"; do
     fi
 done
 
-for sg_id in "$EC2_V1_SG_NAME" "$RDS_SG" "$LB_SG"; do
+for sg_id in "$EC2_V1_SG" "$RDS_SG" "$EC2_V2_SG_NAME" "$LB_SG"; do
     echo "Deleting Security Groups..."
     if [ -n "$sg_id" ]; then
         aws ec2 delete-security-group \

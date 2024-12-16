@@ -1,8 +1,9 @@
+#!/bin/bash
+
 ######################################
 # Phase 3: Load Balancer and Auto Scaling Setup
 ######################################
 
-phase3() {
     echo -e "\n\n\n"
     echo "######################################"
     echo "# Starting Phase 3: Load Balancer and Auto Scaling Setup"

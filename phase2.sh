@@ -15,9 +15,6 @@ echo -e "\n\n\n"
 # echo "# Database Access Preparation"
 # echo "############################################################################################################"
 
-# Initialize status variable to track failures
-local status=0
-
 # Create Database Subnet Group and attach DB Private Subnets
 if [[ $status -eq 0 ]]; then
     execute_command "DB_SUBNET_GROUP_DETAILS=\$(aws rds create-db-subnet-group --db-subnet-group-name \"$DBSubnetGroup\" --db-subnet-group-description \"Inventory RDS Subnet Group\" --subnet-ids \"$DB_SUBNET1\" \"$DB_SUBNET2\" --output text)"
