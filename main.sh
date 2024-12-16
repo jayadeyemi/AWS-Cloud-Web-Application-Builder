@@ -19,6 +19,12 @@ RETRY_INTERVAL=30
 # Command counter for logging
 COMMAND_COUNTER=0
 
+# Set the region
+aws configure set region "$REGION"
+# Renaming variables for IPs
+USER_IP=$USER_PUBLIC_IP_INPUT
+USER_CIDR="$USER_IP/32"
+
 ######################################
 # Utility Functions
 ######################################
@@ -100,16 +106,18 @@ prompt_phase() {
     while true; do
         read -t 300 -r -p "Proceed to Phase ${phase_num} (${phase_name})? (yes/exit/[Press Enter to skip]): " cont
         cont="${cont,,}"
+        echo "$phase_num" >> "$VARIABLES_LOG"
 
         if [[ "$cont" == "yes" ]]; then
             log "$EXECUTION_LOG" "Executing Phase ${phase_num} (${phase_name})..."
             source "$phase_file"
-            if [[ $? -ne 0 ]]; then
+            if mycmd; then
                 log "$EXECUTION_LOG" "Phase ${phase_num} failed. Jumping to Phase 5..."
                 source "$(dirname "$0")/phase5.sh"
                 return 1
             fi
             break
+
         elif [[ "$cont" == "exit" ]]; then
             log "$EXECUTION_LOG" "User exited the script."
             exit 0
@@ -125,11 +133,6 @@ prompt_phase() {
 ######################################
 # Main Script Execution
 ######################################
-# Set the region
-aws configure set region $REGION
-# Renaming variables for IPs
-USER_IP=$USER_PUBLIC_IP_INPUT
-USER_CIDR="$USER_IP/32"
 
 # Main loop
 while true; do
