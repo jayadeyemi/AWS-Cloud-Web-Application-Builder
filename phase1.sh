@@ -276,7 +276,7 @@ fi
 
 # Accept the VPC peering connection request
 if [[ $status -eq 0 ]]; then
-    execute_command "VCP_DETAILS=\$(aws ec2 accept-vpc-peering-connection --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" - --output text)"
+    execute_command "VCP_DETAILS=\$(aws ec2 accept-vpc-peering-connection --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" --output text)"
     status=$?
 fi
 
