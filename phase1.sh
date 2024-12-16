@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# echo "###########################################################################################################"
+# echo "# Phase 1: VPC, Subnets, and EC2-v1 with In-Memory Database"
+# echo "###########################################################################################################"
 phase1() {
 
     # Initialize status variable to track failures
@@ -24,7 +29,7 @@ phase1() {
 
     #Retrieve the DEFAULT VPC Route Table ID
     if [[ $status -eq 0 ]]; then
-        execute_command "DEFAULT_ROUTE_TABLE_ID=\$(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$DEFAULT_VPC_ID" --query 'RouteTables[?Associations[0].Main].RouteTableId' --output text)"
+        execute_command "DEFAULT_ROUTE_TABLE_ID=\$(aws ec2 describe-route-tables --filters 'Name=vpc-id,Values=$DEFAULT_VPC_ID' --query 'RouteTables[?Associations[0].Main].RouteTableId' --output text)"
         status=$?
     fi
     
@@ -40,7 +45,7 @@ phase1() {
 
     # Name the VPC
     if [[ $status -eq 0 ]]; then
-        execute_command "aws ec2 create-tags --resources "$MAIN_VPC_ID" --tags Key=Name,Value="$VPC_NAME""
+        execute_command "aws ec2 create-tags --resources '$MAIN_VPC_ID' --tags Key=Name,Value='$VPC_NAME'"
         status=$?
     fi
 
@@ -152,7 +157,7 @@ phase1() {
 
     # Rename the main route table to public route table
     if [[ $status -eq 0 ]]; then
-        execute_command "aws ec2 create-tags --resources "$MAIN_ROUTE_TABLE_ID" --tags Key=Name,Value="$PUB_ROUTE_TABLE_NAME""
+        execute_command "aws ec2 create-tags --resources "$MAIN_ROUTE_TABLE_ID" --tags 'Key=Name,Value=$PUB_ROUTE_TABLE_NAME'"
         status=$?
         # change the variable name to reflect the new name
         execute_command "PUB_ROUTE_TABLE_ID=$MAIN_ROUTE_TABLE_ID"
@@ -248,7 +253,7 @@ phase1() {
 
     # Name the Elastic IP
     if [[ $status -eq 0 ]]; then
-        execute_command "aws ec2 create-tags --resources "$EIP_ALLOC" --tags Key=Name,Value="$EIP_TAG""
+        execute_command "aws ec2 create-tags --resources "$EIP_ALLOC" --tags 'Key=Name,Value=$EIP_TAG'"
         status=$?
     fi
 
@@ -316,6 +321,8 @@ phase1() {
     # Describe the Cloud9 security group
     if [[ $status -eq 0 ]]; then
         execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids $CLOUD9_INSTANCE_ID --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
+        status=$?
+    fi
     
     # Create a security group for EC2-V1 instance in the main VPC
     if [[ $status -eq 0 ]]; then
@@ -342,7 +349,7 @@ phase1() {
     fi
 
     # Authorize HTTP access to the EC2-V1 security group from the Internet
-      if [[ $status -eq 0 ]]; then
+    if [[ $status -eq 0 ]]; then
         execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id "$EC2_V1_SG_NAME" --protocol tcp --port 80 --cidr "$INTERNET_CIDR"  'query SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
         status=$?
     fi
@@ -359,7 +366,7 @@ phase1() {
 
     # Set the correct permissions for saving the key pair
     if [[ $status -eq 0 ]]; then
-        execute_command "chmod 400 "$PUB_KEY.pem""
+        execute_command "chmod 400 '$PUB_KEY.pem'"
         status=$?
     fi
 
