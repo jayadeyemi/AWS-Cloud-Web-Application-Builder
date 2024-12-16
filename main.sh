@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 ######################################
 # Configuration
 ######################################
@@ -97,6 +97,7 @@ execute_command() {
 ######################################
 # Phase Execution Wrapper
 ######################################
+execute_command "echo Test Command Execution"
 
 prompt_phase() {
     local phase_num=$1
