@@ -40,7 +40,7 @@ log() {
 store_variable() {
     local var_name="$1"
     local var_value="${!var_name}"
-    echo "$var_name=$var_value" >> "$VARIABLES_LOG"
+    echo "$var_name=\"$var_value\"" >> "$VARIABLES_LOG"
 }
 
 # Command execution function
