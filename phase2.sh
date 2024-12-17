@@ -63,7 +63,7 @@ fi
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=$INVENTORY_SERVER_ROLE --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$EC2_V1_NAME}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=$INVENTORY_SERVER_ROLE --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$EC2_V2_NAME}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 
@@ -136,7 +136,7 @@ scp -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no "$SCRIPT_DIR/$DEF
 echo '############################################################################################################'
 ssh -t -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
-mysql -h "$RDS_ENDPOINT" -u "$SECRET_USERNAME" -p"$SECRET_PASSWORD" STUDENTS < /$DEFAULT_DB_FILE
+mysql -h "$RDS_ENDPOINT" -u "$SECRET_USERNAME" -p"$SECRET_PASSWORD" STUDENTS < /tmp/data.sql
 echo '----------------------------------------------------------------------------------------------------------------'
 EOF
 echo '############################################################################################################'
@@ -157,9 +157,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-if [[ $status -eq 0 ]]; then
-    execute_command "TERMINATED_INSTANCE=\$(aws ec2 terminate-instances --instance-ids \"$INSTANCE_ID\" --output text)"
-fi
 
 if [[ $status -eq 0 ]]; then
     echo -e "\n\n\n"
