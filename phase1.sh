@@ -316,19 +316,19 @@ fi
 
 # Create a route in the public route table to the Default VPC
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-route --route-table-id \"$PUB_ROUTE_TABLE_ID\" --destination-cidr-block \"$DEFAULT_VPC_CIDR\" --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" --output text"
+    execute_command "ROUTE1=\$(aws ec2 create-route --route-table-id \"$PUB_ROUTE_TABLE_ID\" --destination-cidr-block \"$DEFAULT_VPC_CIDR\" --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" --output text)"
     status=$?
 fi
 
 # Create a route in the Default VPC route table to the Lab VPC
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-route --route-table-id \"$DEFAULT_ROUTE_TABLE_ID\" --destination-cidr-block \"$VPC_CIDR\" --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" --output text"
+    execute_command "ROUTE2=\$(aws ec2 create-route --route-table-id \"$DEFAULT_ROUTE_TABLE_ID\" --destination-cidr-block \"$VPC_CIDR\" --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" --output text)"
     status=$?
 fi
 
 # Create a route in the main route table to the Internet Gateway
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-route --route-table-id \"$PUB_ROUTE_TABLE_ID\" --destination-cidr-block \"$INTERNET_CIDR\" --gateway-id \"$IGW_ID\" --output text"
+    execute_command "ROUTE3=\$(aws ec2 create-route --route-table-id \"$PUB_ROUTE_TABLE_ID\" --destination-cidr-block \"$INTERNET_CIDR\" --gateway-id \"$IGW_ID\" --output text)"
     status=$?
 fi
 
@@ -340,7 +340,7 @@ fi
 
 # Create a route in the private route table to the NAT Gateway
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-route --route-table-id \"$PRIV_ROUTE_TABLE_ID\" --destination-cidr-block \"$INTERNET_CIDR\" --nat-gateway-id \"$NAT_GW_ID\" --output text"
+    execute_command "ROUTE4=\$(aws ec2 create-route --route-table-id \"$PRIV_ROUTE_TABLE_ID\" --destination-cidr-block \"$INTERNET_CIDR\" --nat-gateway-id \"$NAT_GW_ID\" --output text)"
     status=$?
 fi
 
@@ -368,7 +368,7 @@ fi
 
 # Authorize SSH access to the Cloud9 security group from the EC2-V1 security group
 if [[ $status -eq 0 ]]; then
-    execute_command "CLOUD9_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "CLOUD9_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
