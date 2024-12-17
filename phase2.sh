@@ -21,15 +21,9 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Create a Single Availability Zone RDS Instance
-if [[ $status -eq 0 ]]; then
-    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"RDS credentials for $RDS_NAME_TAG\" --secret-string '{\"username\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
-    status=$?
-fi
-
 # Create RDS Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "RDS_SG=\$(aws ec2 create-security-group --group-name \"$RDS_SG_NAME\" --description \"RDS Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --output text)"
+    execute_command "RDS_SG_ID=\$(aws ec2 create-security-group --group-name \"$RDS_SG_NAME\" --description \"RDS Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --output text)"
     status=$?
 fi
 
@@ -73,7 +67,7 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Create a new RDS instance
+# Create a Single Availability Zone RDS Instance
 if [[ $status -eq 0 ]]; then
     execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DB_DUBNET_GROUP_NAME\" --availability-zone $AVAILABILITY_ZONE1 --master-username $SECRET_USERNAME --master-user-password $SECRET_PASSWORD --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
     status=$?
@@ -88,6 +82,12 @@ fi
 # Get the RDS endpoint
 if [[ $status -eq 0 ]]; then
     execute_command "RDS_ENDPOINT=\$(aws rds describe-db-instances --db-instance-identifier \"$RDS_INSTANCE\" --query 'DBInstances[0].Endpoint.Address' --output text)"
+    status=$?
+fi
+
+# Create a new Secret for RDS
+if [[ $status -eq 0 ]]; then
+    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"username\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
     status=$?
 fi
 
@@ -107,9 +107,8 @@ fi
 # echo "# Database Migration"
 # echo "############################################################################################################"
 
-
-
 # Step 1: Login to the EC2 instance v1 and export the database
+if [[ $status -eq 0 ]]; then
 echo '############################################################################################################'
 ssh -t -i "$SCRIPT_DIR/$PUB_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP" << EOF
 echo '----------------------------------------------------------------------------------------------------------------'
@@ -131,16 +130,18 @@ EOF
 echo '############################################################################################################'
 
 # Step 4: Copy the selected database dump to the EC2 instance v2 (default: sample_entries.sql)
-scp -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no "$SCRIPT_DIR/$DEFAULT_DB_FILE".sql ubuntu@$"$NEW_INSTANCE_PRIVATE_IP":/tmp/data.sql # Copy the dump to the Cloud9 instance
+scp -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no "$SCRIPT_DIR/$DEFAULT_DB_FILE" ubuntu@"$NEW_INSTANCE_PRIVATE_IP":/tmp/data.sql # Copy the dump to the Cloud9 instance
 
 # Step 5: Login to the ec2 instance v2 and export the database to RDS
 echo '############################################################################################################'
 ssh -t -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
-mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD STUDENTS < $SCRIPT_DIR/data.sql
+mysql -h "$RDS_ENDPOINT" -u "$SECRET_USERNAME" -p"$SECRET_PASSWORD" STUDENTS < /$DEFAULT_DB_FILE
 echo '----------------------------------------------------------------------------------------------------------------'
 EOF
 echo '############################################################################################################'
+fi
+
 echo -e "\n\n\n"
 # echo "############################################################################################################"
 # echo "# RDS Multi-AZ Reconfiguration, EC2-v2 backup and EC2-v1 termination"
