@@ -165,8 +165,8 @@ if [[ $status -eq 0 ]]; then
     echo "# Please wait 5 minutes for the web application to be fully operational."
     echo "# You can access the application at http://$NEW_INSTANCE_PUBLIC_IP"
     echo "# The instance needs to be fully operational before proceeding to Phase 3."
-    # echo "RDS Endpoint - $RDS_ENDPOINT"
-    # echo "# EC2-v2 Image ID - $SERVER_V2_IMAGE_ID"
+    echo "RDS Endpoint - $RDS_ENDPOINT"
+    echo "# EC2-v2 Image ID - $SERVER_V2_IMAGE_ID"
     echo "############################################################################################################"
 else
     echo -e "\n\n\n"
