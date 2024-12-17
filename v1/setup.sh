@@ -906,7 +906,7 @@ ssh -i $SCRIPT_DIR/$PUB_KEY.pem -o StrictHostKeyChecking=no ubuntu@$INSTANCE_PRI
 echo '----------------------------------------------------------------------------------------------------------------'
 mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
 echo '----------------------------------------------------------------------------------------------------------------'
-EOF 
+EOF
 echo '############################################################################################################'
 
 # Step 2: Copy the dump from the EC2 instance v1 to the Cloud9 instance

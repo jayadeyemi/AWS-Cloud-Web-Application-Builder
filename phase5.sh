@@ -150,6 +150,37 @@ for sg_id in "$EC2_V1_SG" "$RDS_SG" "$EC2_V2_SG_NAME" "$LB_SG"; do
     fi
 done
 
+# Array of Route Table IDs
+ROUTE_TABLE_IDS=($PUB_ROUTE_TABLE_ID $DEFAULT_ROUTE_TABLE_ID $PRIV_ROUTE_TABLE_ID, $DB_ROUTE_TABLE_ID)
+
+# Function to delete all routes in a route table
+delete_routes() {
+    local ROUTE_TABLE_ID=$1
+
+    # Fetch all routes for the given route table
+    echo "Fetching routes for Route Table: $ROUTE_TABLE_ID"
+    ROUTES=$(aws ec2 describe-route-tables --route-table-ids "$ROUTE_TABLE_ID" \
+        --query "RouteTables[0].Routes[?DestinationCidrBlock!='local'].DestinationCidrBlock" \
+        --output text)
+
+    # Loop through and delete each route
+    for CIDR in $ROUTES; do
+        echo "Deleting route: $CIDR from Route Table: $ROUTE_TABLE_ID"
+        aws ec2 delete-route --route-table-id "$ROUTE_TABLE_ID" --destination-cidr-block "$CIDR"
+        if [[ $? -eq 0 ]]; then
+            echo "Successfully deleted route: $CIDR"
+        else
+            echo "Failed to delete route: $CIDR"
+        fi
+    done
+}
+
+# Loop through each route table and delete routes
+for RT_ID in "${ROUTE_TABLE_IDS[@]}"; do
+    echo "Processing Route Table: $RT_ID"
+    delete_routes "$RT_ID"
+done
+
 # Delete NAT Gateway and Elastic IP
 echo "Deleting NAT Gateway..."
 if [ -n "$NAT_GW_ID" ]; then
@@ -198,8 +229,8 @@ done
 # Delete RDS DB Subnet Group
 echo "Deleting DB Subnet Group..."
 aws rds delete-db-subnet-group \
-    --db-subnet-group-name "$DBSubnetGroup" || true
-check_command_success "Deleting RDS DB Subnet Group $DBSubnetGroup"
+    --db-subnet-group-name "$DG_DUBNET_GROUP_NAME" || true
+check_command_success "Deleting RDS DB Subnet Group $DG_DUBNET_GROUP_NAME"
 
 # Delete Route Tables
 if [ -n "$PUB_ROUTE_TABLE_ID" ]; then

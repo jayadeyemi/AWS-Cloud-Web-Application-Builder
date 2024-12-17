@@ -368,13 +368,13 @@ fi
 
 # Authorize SSH access to the Cloud9 security group from the EC2-V1 security group
 if [[ $status -eq 0 ]]; then
-    execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id \"$$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "CLOUD9_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
 # Authorize HTTP access to the EC2-V1 security group from the Internet
 if [[ $status -eq 0 ]]; then
-    execute_command "AUTH_SECURITY_GROUP=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "EC2_V1_SG_INTERNET_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
