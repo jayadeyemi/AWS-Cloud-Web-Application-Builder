@@ -109,11 +109,11 @@ prompt_phase() {
     local phase_name=$3
 
     while true; do
-        read -t 300 -r -p "Proceed to Phase ${phase_num} (${phase_name})? (yes/exit/[Press Enter to skip]): " cont
+        read -t 300 -r -p "Proceed to Phase ${phase_num} (${phase_name})? (y/n/[Press Enter to skip]): " cont
         cont="${cont,,}"
         echo "$phase_num" >> "$VARIABLES_LOG"
 
-        if [[ "$cont" == "yes" ]]; then
+        if [[ "$cont" == "y" ]]; then
             log "$EXECUTION_LOG" "Executing Phase ${phase_num} (${phase_name})..."
             source "$phase_file"
             if [[ $? -ne 0 ]]; then
@@ -123,14 +123,14 @@ prompt_phase() {
             fi
             break
 
-        elif [[ "$cont" == "exit" ]]; then
+        elif [[ "$cont" == "n" ]]; then
             log "$EXECUTION_LOG" "User exited the script."
             exit 0
         elif [[ -z "$cont" ]]; then
             log "$EXECUTION_LOG" "Skipping Phase ${phase_num}."
             break
         else
-            echo "Invalid input. Please enter 'yes', 'exit', or press Enter to skip."
+            echo "Invalid input. Please enter 'y', 'n', or [press Enter to skip]."
         fi
     done
 }
