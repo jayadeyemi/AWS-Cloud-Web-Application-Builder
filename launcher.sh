@@ -5,8 +5,8 @@
 ######################################
 
 # load environment variables
-source "$(dirname "$0")/env/config/variables.env"
-source "$(dirname "$0")/env/config/constants.env"
+source "$(dirname "$0")/env/variables.env"
+source "$(dirname "$0")/env/constants.env"
 
 ######################################
 # Load the settings
@@ -19,11 +19,8 @@ source "$(dirname "$0")/env/config/settings.sh"
 # Load variables from external file
 ######################################
 
-
 source "$(dirname "$0")/env/config/functions.sh"
 source "$(dirname "$0")/env/config/settings.sh"
-
-
 
 ######################################
 # Main Script Execution
@@ -37,8 +34,8 @@ while true; do
     echo "# Prompts to Execute Phases 1-5"
     echo "######################################"
 
-# Prompt for user input
-read -r -p "Do you want to input a new password? (y/n): " generate_password
+# Prompt for user input and wait 60 seconds for a response
+read -t 60 -r -p "Do you want to input a new password? (y/n): " generate_password
 
 if [[ "$generate_password" =~ ^[Yy]$ ]]; then
     # User chooses to input their own password
@@ -70,7 +67,7 @@ log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
     log "$EXECUTION_LOG" "All phases have been processed."
 
     # Ask if the script should run again
-    read -r -p "Do you want to run the phases again? (y/n): " repeat
+    read -r -p "Do you want to run the phases again? (y/e): " repeat
     repeat="${repeat,,}"
 
     if [[ "$repeat" == "n" ]]; then
