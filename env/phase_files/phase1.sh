@@ -23,14 +23,13 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Describe the Cloud9 security group
+
+
+# Create a security group for the Cloud9 instance if not found
 if [[ $status -eq 0 ]]; then
     execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
     status=$?
 fi
-
-# Create a security group for the Cloud9 instance if not found
-if [[ $status -eq 0 ]]; then
     if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
         # Assign attempt variables
         MAX_ATTEMPTS=5
