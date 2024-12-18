@@ -1,20 +1,13 @@
 #!/bin/bash
 
-# echo "###########################################################################################################"
-# echo "# Phase 1: VPC, Subnets, and EC2-v1 with In-Memory Database"
-# echo "###########################################################################################################"
-
 echo "############################################################################################################"
 echo "# Starting Phase 1: VPC, Subnets, and EC2-v1 with In-Memory Database"
 echo "############################################################################################################"
 echo -e "\n\n\n"
-      ############################################################################################################
-# echo "# Retrieving Information"
-# echo "###########################################################################################################"
-has
+
 # Retrieve the Default VPC ID
 if [[ $status -eq 0 ]]; then
-    execute_command "DEFAULT_VPC_ID=\$(aws ec2 describe-vpcs --filters \"Name=isDefault,Values=true\" --query 'Vpcs[0].VpcId' --output text)"
+    execute_command "DEFAULT_VPC_ID=\$(aws ec2 describe-vpcs --filters 'Name=isDefault,Values=true' --query 'Vpcs[0].VpcId' --output text)"
     status=$?
 fi
 
@@ -30,19 +23,18 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-   # Describe the Cloud9 security group
+# Describe the Cloud9 security group
 if [[ $status -eq 0 ]]; then
     execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
     status=$?
 fi
 
-
 # Create a security group for the Cloud9 instance if not found
 if [[ $status -eq 0 ]]; then
     if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
-    # Assign attempt variables
-    MAX_ATTEMPTS=5
-    attempt=0
+        # Assign attempt variables
+        MAX_ATTEMPTS=5
+        attempt=0
 
         while [[ (-z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None") && $attempt -lt $MAX_ATTEMPTS ]]; do
             ((attempt++))
@@ -60,13 +52,9 @@ else
     exit 1
 fi
 
-# echo "###########################################################################################################"
-# echo "# VPC Creation and Subnet Creation"
-# echo "###########################################################################################################"
-
 # Create a VPC
 if [[ $status -eq 0 ]]; then
-    execute_command "MAIN_VPC_ID=\$(aws ec2 create-vpc --cidr-block \"$VPC_CIDR\" --query 'Vpc.VpcId' --output text)" 
+    execute_command "MAIN_VPC_ID=\$(aws ec2 create-vpc --cidr-block \"$VPC_CIDR\" --query 'Vpc.VpcId' --output text)"
     status=$?
 fi
 
@@ -172,10 +160,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# echo "###########################################################################################################"
-# echo "# Route Table Creation and Association"
-# echo "###########################################################################################################"
-
 # Retrieve the Main Route Table ID
 if [[ $status -eq 0 ]]; then
     execute_command "MAIN_ROUTE_TABLE_ID=\$(aws ec2 describe-route-tables --filters \"Name=vpc-id,Values=$MAIN_VPC_ID\" \"Name=association.main,Values=true\" --query \"RouteTables[0].RouteTableId\" --output text)"
@@ -250,12 +234,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-
-# echo "###########################################################################################################"
-# echo "# Internet Gateway, NAT Gateway, Elastic IP, and VPC Peering creation and attachment"
-# echo "###########################################################################################################"
-
-
 # Create an Internet Gateway
 if [[ $status -eq 0 ]]; then
     execute_command "IGW_ID=\$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text)"
@@ -310,10 +288,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# echo "###########################################################################################################"
-# echo "# Route Table Updates"
-# echo "###########################################################################################################"
-
 # Create a route in the public route table to the Default VPC
 if [[ $status -eq 0 ]]; then
     execute_command "ROUTE1=\$(aws ec2 create-route --route-table-id \"$PUB_ROUTE_TABLE_ID\" --destination-cidr-block \"$DEFAULT_VPC_CIDR\" --vpc-peering-connection-id \"$PEERING_CONNECTION_ID\" --output text)"
@@ -343,10 +317,6 @@ if [[ $status -eq 0 ]]; then
     execute_command "ROUTE4=\$(aws ec2 create-route --route-table-id \"$PRIV_ROUTE_TABLE_ID\" --destination-cidr-block \"$INTERNET_CIDR\" --nat-gateway-id \"$NAT_GW_ID\" --output text)"
     status=$?
 fi
-
-# echo "###########################################################################################################"
-# echo "# Security Group Creation and authorizations"
-# echo "###########################################################################################################"
 
 # Create a security group for EC2-V1 instance in the main VPC
 if [[ $status -eq 0 ]]; then
@@ -378,10 +348,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# echo "###########################################################################################################"
-# echo "# EC2 Instance Creation and Launch"
-# echo "###########################################################################################################"
-# use variable for key name
 # Create a key pair for the EC2 instance
 if [[ $status -eq 0 ]]; then
     execute_command "aws ec2 create-key-pair --key-name \"$PUB_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PUB_KEY.$KEY_FORMAT\""

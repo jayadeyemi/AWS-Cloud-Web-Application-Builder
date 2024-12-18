@@ -7,13 +7,10 @@
 echo -e "\n\n\n"
 echo "############################################################################################################"
 echo "# Starting Phase 2: Migration to RDS"
-echo "# version #2 Application Launch for communication with RDS"
+echo "# Version #2 Application Launch for communication with RDS"
 echo "# Server v1 image backup and termination"
 echo "############################################################################################################"
 echo -e "\n\n\n"
-# echo "############################################################################################################"
-# echo "# Database Access Preparation"
-# echo "############################################################################################################"
 
 # Create Database Subnet Group and attach DB Private Subnets
 if [[ $status -eq 0 ]]; then
@@ -29,23 +26,19 @@ fi
 
 # Authorize RDS Security Group access to EC2-v1 Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "EC2_V1_SG_RDS_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "EC2_V1_SG_RDS_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
 # Authorize EC2-v1 Security Group access to RDS Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "RDS_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG_ID\" --protocol tcp --port 3306 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    execute_command "RDS_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG_ID\" --protocol tcp --port 3306 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
-# echo "############################################################################################################"
-# echo "# EC2-v2 Launch Preparation, RDS Instance Creation"
-# echo "############################################################################################################"
-
 # Create a new key pair for EC2-v2
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-key-pair --key-name \"$PRIV_KEY\" --key-type --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY\".\"$KEY_FORMAT\""
+    execute_command "aws ec2 create-key-pair --key-name \"$PRIV_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY.$KEY_FORMAT\""
     status=$?
 fi
 
@@ -103,19 +96,15 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# echo "############################################################################################################"
-# echo "# Database Migration"
-# echo "############################################################################################################"
-
 # Step 1: Login to the EC2 instance v1 and export the database
 if [[ $status -eq 0 ]]; then
-echo '############################################################################################################'
-ssh -t -i "$SCRIPT_DIR/$PUB_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP" << EOF
-echo '----------------------------------------------------------------------------------------------------------------'
-mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
-echo '----------------------------------------------------------------------------------------------------------------'
+    echo '############################################################################################################'
+    ssh -t -i "$SCRIPT_DIR/$PUB_KEY.pem" -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP" << EOF
+    echo '----------------------------------------------------------------------------------------------------------------'
+    mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
+    echo '----------------------------------------------------------------------------------------------------------------'
 EOF
-echo '############################################################################################################'
+    echo '############################################################################################################'
 
 # Step 2: Copy the dump from the EC2 instance v1 to the Cloud9 instance
 scp -i "$SCRIPT_DIR/$PUB_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP":/tmp/data.sql "$SCRIPT_DIR"/data.sql # Copy the dump to the Cloud9 instance 
@@ -143,9 +132,6 @@ echo '##########################################################################
 fi
 
 echo -e "\n\n\n"
-# echo "############################################################################################################"
-# echo "# RDS Multi-AZ Reconfiguration, EC2-v2 backup and EC2-v1 termination"
-# echo "############################################################################################################"
 # RDS Multi-AZ Reconfiguration, EC2-v2 backup and EC2-v1 termination
 if [[ $status -eq 0 ]]; then
     execute_command "RDS_MODIFY=\$(aws rds modify-db-instance --db-instance-identifier \"$RDS_INSTANCE\" --multi-az --apply-immediately --backup-retention-period 1 --output text)"

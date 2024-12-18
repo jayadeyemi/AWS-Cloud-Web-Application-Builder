@@ -77,38 +77,36 @@ execute_command() {
     return $status
 }
 
-######################################
-# Phase Execution Wrapper
-######################################
+####################################################################################################
+# Phase Execution Wrapper Function
+####################################################################################################
 
 prompt_phase() {
-    local phase_num=$1
-    local phase_file=$2
-    local phase_name=$3
+    local phase_num="$1"
+    local phase_file="$2"
+    local phase_name="$3"
 
     while true; do
         read -t 300 -r -p "Proceed to Phase ${phase_num} (${phase_name})? (y/n/[Press Enter to skip]): " cont
         cont="${cont,,}"
-        echo "$phase_num" >> "$VARIABLES_LOG"
 
         if [[ "$cont" == "y" ]]; then
             log "$EXECUTION_LOG" "Executing Phase ${phase_num} (${phase_name})..."
             source "$phase_file"
             if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "Phase ${phase_num} failed. Jumping to Phase 5..."
-                source "$(dirname "$0")/phase5.sh"
+                log "$EXECUTION_LOG" "Phase ${phase_num} failed. Proceeding to cleanup."
+                source "$(dirname "$0")/../phase_files/phase5.sh"
                 return 1
             fi
             break
-
         elif [[ "$cont" == "n" ]]; then
-            log "$EXECUTION_LOG" "User exited the script."
+            log "$EXECUTION_LOG" "User chose to exit."
             exit 0
         elif [[ -z "$cont" ]]; then
             log "$EXECUTION_LOG" "Skipping Phase ${phase_num}."
             break
         else
-            echo "Invalid input. Please enter 'y', 'n', or [press Enter to skip]."
+            echo "Invalid input. Please enter 'y', 'n', or press Enter to skip."
         fi
     done
 }
