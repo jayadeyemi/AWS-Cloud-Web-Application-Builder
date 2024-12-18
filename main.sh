@@ -25,6 +25,12 @@ aws configure set region "$REGION"
 USER_IP=$USER_PUBLIC_IP_INPUT
 USER_CIDR="$USER_IP/32"
 
+if [ "$USER_OS" = "mac" ]; then
+    KEY_FORMAT="pem"
+else
+    KEY_FORMAT="ppk"
+fi
+
 ######################################
 # Utility Functions
 ######################################
