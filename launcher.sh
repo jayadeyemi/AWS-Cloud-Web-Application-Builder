@@ -21,6 +21,14 @@ source "$(dirname "$0")/env/config/settings.sh"
 
 source "$(dirname "$0")/env/config/functions.sh"
 source "$(dirname "$0")/env/config/settings.sh"
+ASG_config="$(dirname "$0")/env/config/config.json"
+######################################
+# User Data
+######################################
+
+USER_DATA_FILE_V1="$(dirname "$0")/env/config/ec2_v1_userdata.sh"
+USER_DATA_FILE_V2="$(dirname "$0")/env/config/ec2_v2_userdata.sh"
+
 
 ######################################
 # Main Script Execution
