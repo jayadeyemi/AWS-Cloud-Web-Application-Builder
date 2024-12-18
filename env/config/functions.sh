@@ -1,39 +1,6 @@
-#!/bin/bash
-
-######################################
-# Configuration
-######################################
-
-# Load variables from external file
-source "$(dirname "$0")/variables.env"
-
-# Log files
-EXECUTION_LOG="$(dirname "$0")/execution.log"
-RESPONSE_LOG="$(dirname "$0")/response.log"
-VARIABLES_LOG="$(dirname "$0")/created_resourses.log"
-
-# Retry settings
-RETRY_LIMIT=5
-RETRY_INTERVAL=30
-
-# Command counter for logging
-COMMAND_COUNTER=0
-
-# Set the region
-aws configure set region "$REGION"
-# Renaming variables for IPs
-USER_IP=$USER_PUBLIC_IP_INPUT
-USER_CIDR="$USER_IP/32"
-
-if [ "$USER_OS" = "mac" ]; then
-    KEY_FORMAT="pem"
-else
-    KEY_FORMAT="ppk"
-fi
-
-######################################
-# Utility Functions
-######################################
+###################################################################################################
+# Functions
+###################################################################################################
 
 # Logging function
 log() {
@@ -42,14 +9,20 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $message" | tee -a "$log_file"
 }
 
+####################################################################################################
 # Function to log variables
+####################################################################################################
+
 store_variable() {
     local var_name="$1"
     local var_value="${!var_name}"
     echo "$var_name=\"$var_value\"" >> "$VARIABLES_LOG"
 }
 
+####################################################################################################
 # Command execution function
+####################################################################################################
+
 execute_command() {
     local command="$1"
     local retries=0
@@ -104,7 +77,6 @@ execute_command() {
     return $status
 }
 
-
 ######################################
 # Phase Execution Wrapper
 ######################################
@@ -141,30 +113,6 @@ prompt_phase() {
     done
 }
 
-######################################
-# Main Script Execution
-######################################
-
-# Main loop
-while true; do
-    echo "######################################"
-    echo "# Prompts to Execute Phases 1-5"
-    echo "######################################"
-
-    # Execute each phase
-    prompt_phase 1 "$(dirname "$0")/phase1.sh" "Phase 1 - 1st Instance Deployment" || continue
-    prompt_phase 2 "$(dirname "$0")/phase2.sh" "Phase 2 - 2nd Instance Deployment" || continue
-    prompt_phase 3 "$(dirname "$0")/phase3.sh" "Phase 3 - Autoscaling Group Deployment" || continue
-    prompt_phase 4 "$(dirname "$0")/phase4.sh" "Phase 4 - Load-Tester for the Autoscaling Group" || continue
-    prompt_phase 5 "$(dirname "$0")/phase5.sh" "Phase 5 - Cleanup Function" || continue
-
-    log "$EXECUTION_LOG" "All phases have been processed."
-
-    # Ask if the script should run again
-    read -r -p "Do you want to run the phases again? (yes/no): " repeat
-    repeat="${repeat,,}"
-
-    if [[ "$repeat" == "no" ]]; then
-        log "$EXECUTION_LOG" "Exiting the script."
-    fi
-done
+####################################################################################################
+# End of functions.sh
+####################################################################################################

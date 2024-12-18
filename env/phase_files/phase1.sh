@@ -11,7 +11,7 @@ echo -e "\n\n\n"
       ############################################################################################################
 # echo "# Retrieving Information"
 # echo "###########################################################################################################"
-
+has
 # Retrieve the Default VPC ID
 if [[ $status -eq 0 ]]; then
     execute_command "DEFAULT_VPC_ID=\$(aws ec2 describe-vpcs --filters \"Name=isDefault,Values=true\" --query 'Vpcs[0].VpcId' --output text)"
@@ -384,13 +384,13 @@ fi
 # use variable for key name
 # Create a key pair for the EC2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-key-pair --key-name \"$PUB_KEY\" --key-type rsa --key-format "$KEY_FORMAT" --query 'KeyMaterial' --output text \"$PUB_KEY.$KEY_FORMAT\""
+    execute_command "aws ec2 create-key-pair --key-name \"$PUB_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PUB_KEY.$KEY_FORMAT\""
     status=$?
 fi
 
 # Set the correct permissions for saving the key pair
 if [[ $status -eq 0 ]]; then
-    execute_command "chmod 400 \"$PUB_KEY.pem\""
+    execute_command "chmod 400 \"$PUB_KEY.$KEY_FORMAT\""
     status=$?
 fi
 

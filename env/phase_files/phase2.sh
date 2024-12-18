@@ -45,13 +45,13 @@ fi
 
 # Create a new key pair for EC2-v2
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-key-pair --key-name \"$PRIV_KEY\" --query 'KeyMaterial' --output text > \"$PRIV_KEY.pem\""
+    execute_command "aws ec2 create-key-pair --key-name \"$PRIV_KEY\" --key-type --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY\".\"$KEY_FORMAT\""
     status=$?
 fi
 
 # Set permissions for saving the private key
 if [[ $status -eq 0 ]]; then
-    execute_command "chmod 400 \"$PRIV_KEY.pem\""
+    execute_command "chmod 400 \"$PRIV_KEY.$KEY_FORMAT\""
     status=$?
 fi
 
