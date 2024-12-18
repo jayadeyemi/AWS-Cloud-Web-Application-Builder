@@ -75,7 +75,7 @@ log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
     log "$EXECUTION_LOG" "All phases have been processed."
 
     # Ask if the script should run again
-    read -r -p "Do you want to run the phases again? (y/e): " repeat
+    read -r -p "Do you want to continue? (y/n): " repeat
     repeat="${repeat,,}"
 
     if [[ "$repeat" == "n" ]]; then
