@@ -360,7 +360,7 @@ fi
 # Launch the EC2 instance
 if [[ $status -eq 0 ]]; then
     echo "Launching EC2-v1 instance..."
-    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data \"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 
