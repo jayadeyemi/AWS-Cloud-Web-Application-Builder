@@ -1,44 +1,32 @@
 #!/bin/bash
 
 ######################################
-# Load environment variables
+# Load environment variables and path
 ######################################
 
 # load environment variables
 source "$(dirname "$0")/env/variables.env"
 source "$(dirname "$0")/env/constants.env"
 
-######################################
-# Load the settings
-######################################
-
-# load settings file
+# load settings
 source "$(dirname "$0")/env/config/settings.sh"
 
-######################################
-# Load variables from external file
-######################################
-
+# Load functions
 source "$(dirname "$0")/env/config/functions.sh"
-source "$(dirname "$0")/env/config/settings.sh"
+
+# Load Autoscaling Rule
 ASG_config="$(dirname "$0")/env/config/config.json"
-######################################
-# User Data
-######################################
 
-export USER_DATA_FILE_V1="$(dirname "$0")/env/config/ec2_v1_userdata.sh"
-export USER_DATA_FILE_V2="$(dirname "$0")/env/config/ec2_v2_userdata.sh"
+# Instance User Data
+USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
+USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 
-#display the user data files
-log "$VARIABLES_LOG" "USER_DATA_FILE_V1=$USER_DATA_FILE_V1"
-######################################
-# DB Secrets
-######################################
+# Main Helper
+call_phase5="$(dirname "$0")/env/phase_files/phase5.sh"
 
-DB_SECRET_FILE="$(dirname "$0")/env/config/db_secret.sh"
-######################################
 
-# Prompt for user input and wait 60 seconds for a response
+
+# Obtain DB password
 read -t 60 -r -p "Do you want to input a new password? (y/n): " generate_password
 
 if [[ "$generate_password" =~ ^[Yy]$ ]]; then
@@ -83,10 +71,10 @@ while true; do
     log "$EXECUTION_LOG" "All phases have been processed."
 
     # Ask if the script should run again
-    read -r -p "Do you want to continue? (y/n): " repeat
+    read -r -p "Press Enter to restart): " repeat
     repeat="${repeat,,}"
 
-    if [[ "$repeat" == "n" ]]; then
+    if [[ "$repeat" != "" ]]; then
         log "$EXECUTION_LOG" "Exiting the script."
         break
     fi

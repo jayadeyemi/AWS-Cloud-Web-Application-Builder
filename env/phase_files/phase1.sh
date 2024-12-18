@@ -1,4 +1,5 @@
 #!/bin/bash
+status=0
 
 echo "############################################################################################################"
 echo "# Starting Phase 1: VPC, Subnets, and EC2-v1 with In-Memory Database"
@@ -27,6 +28,8 @@ fi
 if [[ $status -eq 0 ]]; then
     CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
 fi
+
+# Check if the Cloud9 security group is found
 if [[ $status -eq 0 ]]; then
     if [[ -z "$CLOUD9_SG_ID" || "$CLOUD9_SG_ID" == "None" ]]; then
         # Assign attempt variables
@@ -37,7 +40,7 @@ if [[ $status -eq 0 ]]; then
             ((attempt++))
             echo "Attempt $attempt of $MAX_ATTEMPTS"
             read -p "Enter the correct Cloud9 instance ID: " CLOUD9_INSTANCE_ID
-            execute_command "CLOUD9_SG_ID=\$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)"
+            CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
             status=$?
             if [[ $status -ne 0 ]]; then
                 echo "Failed to retrieve security group ID for instance ID: $CLOUD9_INSTANCE_ID. Please try again."
@@ -45,8 +48,7 @@ if [[ $status -eq 0 ]]; then
         done
     fi
 else
-    echo "Error retrieving security group ID for instance ID: $CLOUD9_INSTANCE_ID. Exiting."
-    exit 1
+    status=1
 fi
 
 # Create a VPC
