@@ -26,21 +26,17 @@ ASG_config="$(dirname "$0")/env/config/config.json"
 # User Data
 ######################################
 
-USER_DATA_FILE_V1="$(dirname "$0")/env/config/ec2_v1_userdata.sh"
-USER_DATA_FILE_V2="$(dirname "$0")/env/config/ec2_v2_userdata.sh"
+export USER_DATA_FILE_V1="$(dirname "$0")/env/config/ec2_v1_userdata.sh"
+export USER_DATA_FILE_V2="$(dirname "$0")/env/config/ec2_v2_userdata.sh"
 
-
+#display the user data files
+log "$VARIABLES_LOG" "USER_DATA_FILE_V1=$USER_DATA_FILE_V1"
 ######################################
-# Main Script Execution
+# DB Secrets
 ######################################
 
-# Main loop
-# This script runs an infinite loop using a while loop.
-# The loop will continue to execute until it is manually stopped.
-while true; do
-    echo "######################################"
-    echo "# Prompts to Execute Phases 1-5"
-    echo "######################################"
+DB_SECRET_FILE="$(dirname "$0")/env/config/db_secret.sh"
+######################################
 
 # Prompt for user input and wait 60 seconds for a response
 read -t 60 -r -p "Do you want to input a new password? (y/n): " generate_password
@@ -65,7 +61,19 @@ SECRET_PASSWORD=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
 fi
 
 log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
-    
+
+#######################################
+# Main loop
+#######################################
+
+# This script runs an infinite loop using a while loop.
+# The loop will continue to execute until it is manually stopped.
+while true; do
+    echo "######################################"
+    echo "# Prompts to Execute Phases 1-5"
+    echo "######################################"
+
+
     # Execute each phase
     prompt_phase 1 "$(dirname "$0")/env/phase_files/phase1.sh" "Phase 1 - 1st Instance Deployment" || continue
     prompt_phase 2 "$(dirname "$0")/env/phase_files/phase2.sh" "Phase 2 - 2nd Instance Deployment" || continue
