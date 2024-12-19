@@ -40,21 +40,21 @@ execute_phase() {
             source "$phase_file"
             if [[ $? -ne 0 ]]; then
                 log "$EXECUTION_LOG" "Phase ${phase_num} failed."
-                return 0
+                return 1
             fi
             break
         elif [[ "$cont" == "n" ]]; then
             log "$EXECUTION_LOG" "User chose to exit."
             exit 0
         elif [[ -z "$cont" && $timed_out -eq 0 ]]; then
-            log "$EXECUTION_LOG" "Skipping Phase ${phase_num}."
+            log "$EXECUTION_LOG" "Skipping Phase ${phase_num} due to previously failed status."
             break
         elif [[ $timed_out -eq 1 ]]; then
             log "$EXECUTION_LOG" "Timeout reached. Automatically proceeding to Phase ${phase_num} (${phase_name})."
             source "$phase_file"
             if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "Phase ${phase_num} failed on timeout execution."
-                return 0
+                log "$EXECUTION_LOG" "Phase ${phase_num} failed on automatic execution."
+                return 1
             fi
             break
         else

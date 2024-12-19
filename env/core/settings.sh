@@ -20,6 +20,8 @@ PHASE_DELAY=60
 # Command counter for logging
 COMMAND_COUNTER=0
 
+# DB_FILE
+CHOSEN_DB_FILE="$DEFAULT_DB_FILE"
 #Path to key pair
 mkdir -p $(dirname "$0")/env/keys/
 PUB_KEY="$(dirname "$0")/env/keys/$PUBLIC_KEY.$KEY_FORMAT"
