@@ -1,8 +1,8 @@
 #!/bin/bash
 
-######################################
+##################################################################################################################
 # Load environment variables and path
-######################################
+##################################################################################################################
 
 # load environment variables
 source "$(dirname "$0")/env/variables.env"
@@ -21,19 +21,25 @@ ASG_config="$(dirname "$0")/env/workers/config.json"
 USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
 USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 
-# Implement Autoscaling Rule using helper function
-source "$(dirname "$0")/env/workers/helper.sh"
+# Execute Autoscaling Rule using helper function
+$(dirname "$0")/env/workers/helper.sh
 
 # Obtain DB password
-read -t $DB_Password_wait -r -p "Do you want to input a new password? (y/n): " generate_password
-
+echo "############################################################################################################"
+echo "# Variables Initialized"
+echo "# Press [y] to input a password, or"
+echo "# Press any other key to generate a random password."
+echo "############################################################################################################"
+read -t $DB_Password_wait -r -p "# User Input: " generate_password
+echo "############################################################################################################"
+echo -e "\n\n\n"
 if [[ "$generate_password" =~ ^[Yy]$ ]]; then
     # User chooses to input their own password
     while true; do
         read -r -s "Enter password: " SECRET_PASSWORD
         read -r -s "Confirm password: " confirm_password
-        if [[ "$SECRET_PASSWORD" == "$confirm_password" ]]; then
-            echo "Passwords match. Password set successfully."
+        if [[ "$SECRET_PASSWORD" == "$confirm_password" && "$SECRET_PASSWORD" != "" ]]; then
+            echo "Passwords match. Password: $SECRET_PASSWORD"
             break
         else
             echo "Passwords do not match. Please try again."
@@ -51,9 +57,9 @@ log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
 
 # The loop will continue to execute until it is manually stopped.
 while true; do
-    echo "######################################"
+    echo "############################################################################################################"
     echo "# Prompts to Execute Phases 1-5"
-    echo "######################################"
+    echo "############################################################################################################"
 
     # Execute each phase
     prompt_phase 1 "$(dirname "$0")/env/phase_files/phase1.sh" "1st Instance Deployment" || continue
@@ -63,15 +69,27 @@ while true; do
     log "$EXECUTION_LOG" "All phases have been processed."
 
     # Ask if the script should run again
-    read -r -p "Press Enter to restart, Press "y" to Delete all created resources): " repeat
+    echo "############################################################################################################"
+    echo "# Press Enter to restart the script, or"
+    echo "# Press 'y' to run the script again, or"
+    echo "# Press any other key to exit the script."
+    read -r -p "# User Input: " repeat
+    echo "############################################################################################################"
     repeat="${repeat,,}"
 
     if [[ "$repeat" == "y" ]]; then
         source "$(dirname "$0")/env/phase_files/phase5.sh"
         log "$EXECUTION_LOG" "Phase 5 completed."
 
-    elif[[ "$repeat" != "" ]]; then
+    elif [[ "$repeat" != "" ]]; then
         log "$EXECUTION_LOG" "Exiting the script."
         break
     fi
 done
+echo "############################################################################################################"
+echo "# End of Script"
+echo "############################################################################################################"
+
+##################################################################################################################
+# End of launcher.sh
+##################################################################################################################

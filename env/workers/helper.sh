@@ -10,7 +10,7 @@ SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 USER_IP=$USER_PUBLIC_IP_INPUT
 USER_CIDR="$USER_IP/32"
 
-# Decide the SSH key forma
+# Decide the SSH key format
 if [ "$USER_OS" = "mac" ]; then
     KEY_FORMAT="pem"
 else
@@ -18,4 +18,4 @@ else
 fi
 
 # ASG Target Value Modifier
-sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "./config.json"
+sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$ASG_config"

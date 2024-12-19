@@ -123,6 +123,7 @@ prompt_phase() {
             # Invalid input
             echo "Invalid input. Please enter 'y', 'n', or press Enter to skip."
         fi
+    done
 }
 
 ####################################################################################################
