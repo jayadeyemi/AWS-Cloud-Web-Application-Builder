@@ -1,19 +1,20 @@
 #!/bin/bash
 
-######################################
-# Phase 3: Load Balancer and Auto Scaling Setup
-######################################
-
-echo -e "\n\n\n"
-echo "######################################"
-echo "# Starting Phase 3: Load Balancer and Auto Scaling Setup"
-echo "######################################"
 # Initialize status variable to track failures
 status=0
 
+######################################
+# Phase 3: Load Balancer and Auto Scaling Setup
+######################################
+echo "-------------------------------------------------------------------------------------------------------------"
+echo "############################################################################################################"
+echo "# Starting Phase 3: Load Balancer and Auto Scaling Setup"
+echo "############################################################################################################"
+echo -e "\n\n\n"
+
 if [[ $status -eq 0 ]]; then
     echo "Creating EC2-v3 Launch Template..."
-    execute_command "LAUNCH_TEMPLATE_ID=\$(aws ec2 create-launch-template --launch-template-name \"$LAUNCH_TEMPLATE_NAME\" --version-description \"Initial version\" --launch-template-data '{\"ImageId\":\"$SERVER_V2_IMAGE_ID\",\"InstanceType\":\"t2.micro\",\"KeyName\":\"$PRIV_KEY\",\"SecurityGroupIds\":[\"$EC2_V1_SG_NAME\"]}' --query 'LaunchTemplate.LaunchTemplateId' --output text)"
+    execute_command "LAUNCH_TEMPLATE_ID=\$(aws ec2 create-launch-template --launch-template-name \"$LAUNCH_TEMPLATE_NAME\" --version-description \"Initial version\" --launch-template-data '{\"ImageId\":\"$SERVER_V2_IMAGE_ID\",\"InstanceType\":\"t2.micro\",\"KeyName\":\"$PRIV_KEY\",\"SecurityGroupIds\":[\"$EC2_V1_SG_ID\"]}' --query 'LaunchTemplate.LaunchTemplateId' --output text)"
     status=$?
 fi
 
@@ -28,13 +29,13 @@ if [[ $status -eq 0 ]]; then
 fi
 
 if [[ $status -eq 0 ]]; then
-    execute_command "LB_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$LB_SG\" --protocol tcp --port 80 --source-group \"$EC2_V1_SG_NAME\" --query 'SecurityGroupRuleId' --output text)"
+    execute_command "LB_SG_EC2_V1_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$LB_SG\" --protocol tcp --port 80 --source-group \"$EC2_V1_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
 # Remove the rule that allows all traffic from the internet
 if [[ $status -eq 0 ]]; then
-    execute_command "EC2_V1_SG_INTERNET_ACCESS=\$(aws ec2 revoke-security-group-ingress --group-id \"$EC2_V1_SG_NAME\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\")"
+    execute_command "EC2_V1_SG_INTERNET_ACCESS=\$(aws ec2 revoke-security-group-ingress --group-id \"$EC2_V1_SG_ID\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\")"
     status=$?
 fi
 
@@ -55,7 +56,17 @@ if [[ $status -eq 0 ]]; then
 fi
 
 if [[ $status -eq 0 ]]; then
-    execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group --auto-scaling-group-name \"$EC2_ASG_NAME\" --launch-template LaunchTemplateId=\"$LAUNCH_TEMPLATE_ID\",Version=1 --min-size 2 --max-size 6 --desired-capacity 2 --target-group-arns \"$TG_ARN\" --vpc-zone-identifier \"$PRIV_SUBNET1,$PRIV_SUBNET2\" --target-tracking-configuration file://config.json)"
+    execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group --auto-scaling-group-name \"$EC2_ASG_NAME\" --launch-template LaunchTemplateId=\"$LAUNCH_TEMPLATE_ID\",Version=1 --min-size 2 --max-size 6 --desired-capacity 2 --target-group-arns \"$TG_ARN\" --vpc-zone-identifier \"$PRIV_SUBNET1,$PRIV_SUBNET2\" --health-check-type ELB --health-check-grace-period 300)"
+    status=$?
+fi
+
+if [[ $status -eq 0 ]]; then
+    execute_command "ASG_GROUP_POLICY=\$(aws autoscaling put-scaling-policy --policy-name \"ASG_POLICY_NAME\" --auto-scaling-group-name \"$EC2_ASG_NAME\" --policy-type TargetTrackingScaling --target-tracking-configuration file://\"$ASG_config\")"
+    status=$?
+fi
+
+if [[ $status -eq 0 ]]; then
+    execute_command "aws elbv2 create-listener --load-balancer-arn \"$LB_ARN\" --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=\"$TG_ARN\""
     status=$?
 fi
 
@@ -65,8 +76,17 @@ if [[ $status -eq 0 ]]; then
 fi
 
 if [[ $status -eq 0 ]]; then
-    echo "Phase 3 Complete: Load Balancer and Auto Scaling setup finished."
-    echo "Load Balancer DNS: $LB_DNS"
+    echo -e "\n\n\n"
+    echo "############################################################################################################"
+    echo "# Phase 3 Complete: Load Balancer and Auto Scaling setup finished."
+    echo "# You can access the application through the load balancer at http://$LB_DNS"
+    echo "############################################################################################################"
+    echo "-------------------------------------------------------------------------------------------------------------"
+
 else
-    echo "Phase 3 encountered errors and did not complete successfully."
+    echo -e "\n\n\n"
+    echo "############################################################################################################"
+    echo "# Phase 3 encountered errors and did not complete successfully."
+    echo "############################################################################################################"
+    echo "-------------------------------------------------------------------------------------------------------------"
 fi

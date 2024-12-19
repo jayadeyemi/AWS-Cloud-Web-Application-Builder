@@ -21,11 +21,6 @@ ASG_config="$(dirname "$0")/env/config/config.json"
 USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
 USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 
-# Main Helper
-call_phase5="$(dirname "$0")/env/phase_files/phase5.sh"
-
-
-
 # Obtain DB password
 read -t 60 -r -p "Do you want to input a new password? (y/n): " generate_password
 
