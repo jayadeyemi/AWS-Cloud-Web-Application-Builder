@@ -70,19 +70,19 @@ fi
 
 # Create a new key pair for EC2-v2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-key-pair --key-name \"$PRIV_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY.$KEY_FORMAT\""
+    execute_command "aws ec2 create-key-pair --key-name \"$PRIVATE_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY\""
     status=$?
 fi
 
 # Set permissions for saving the private key
 if [[ $status -eq 0 ]]; then
-    execute_command "chmod 400 \"$PRIV_KEY.$KEY_FORMAT\""
+    execute_command "chmod 400 \"$PRIV_KEY\""
     status=$?
 fi
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V2_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=\"$INVENTORY_SERVER_ROLE\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V2_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIVATE_KEY\" --security-group-ids \"$EC2_V2_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=\"$INVENTORY_SERVER_ROLE\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V2_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 
@@ -138,9 +138,9 @@ echo -e "\n\n\n"
 # Step 1: Login to the EC2 instance v2 and export the database
 if [[ $status -eq 0 ]]; then
     echo '############################################################################################################'
-    ssh -t -i "$SCRIPT_DIR/$PUB_KEY.pem" -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP" << EOF
+    ssh -t -i "$PUB_KEY" -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP" << EOF
     echo '----------------------------------------------------------------------------------------------------------------'
-    echo '----------------------------------File is being imported to Cloud9----------------------------------------------'
+    echo '--------------------------------Creating-a-dump-of-the-Database-------------------------------------------------'
     echo '----------------------------------------------------------------------------------------------------------------'
     mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
     echo '----------------------------------------------------------------------------------------------------------------'
@@ -149,13 +149,13 @@ EOF
     echo '############################################################################################################'
 
 # Step 2: Copy the dump from the EC2 instance v2 to the Cloud9 instance
-scp -i "$SCRIPT_DIR/$PUB_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP":/tmp/data.sql "$SCRIPT_DIR"/data.sql # Copy the dump to the Cloud9 instance 
+scp -i "$PUB_KEY" -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP":/tmp/data.sql "$DATA_DIR".sql # Copy the dump to the Cloud9 instance 
 
 # Step 3: Login to the EC2 instance v2 and create the database 
 echo '############################################################################################################'
-ssh -t -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
+ssh -t -i "$PRIV_KEY" -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
-echo '----------------------------------File is being exported to EC2 v2----------------------------------------------'
+echo '------------------------------Commanding-RDS-to-create-a-database-through-EC2-v2--------------------------------'
 echo '----------------------------------------------------------------------------------------------------------------'
 mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD -e 'CREATE DATABASE STUDENTS' # Create the database
 echo '----------------------------------------------------------------------------------------------------------------'
@@ -164,13 +164,13 @@ EOF
 echo '############################################################################################################'
 
 # Step 4: Copy the selected database dump to the EC2 instance v2 (default: sample_entries.sql)
-scp -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no "$SCRIPT_DIR/$DEFAULT_DB_FILE" ubuntu@"$NEW_INSTANCE_PRIVATE_IP":/tmp/data.sql # Copy the dump to the Cloud9 instance
+scp -i "$PRIV_KEY" -o StrictHostKeyChecking=no "$DEFAULT_DB_FILE" ubuntu@"$NEW_INSTANCE_PRIVATE_IP":/tmp/data.sql # Copy the dump to the Cloud9 instance
 
 # Step 5: Login to the ec2 instance v2 and export the database to RDS
 echo '############################################################################################################'
-ssh -t -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
+ssh -t -i "$PRIV_KEY" -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
-echo '--------------------------EC2 v2 is exporting file to RDS-------------------------------------------------------'
+echo '------------------------------------EC2 v2 is exporting file to RDS---------------------------------------------'
 echo '----------------------------------------------------------------------------------------------------------------'
 mysql -h "$RDS_ENDPOINT" -u "$SECRET_USERNAME" -p"$SECRET_PASSWORD" STUDENTS < /tmp/data.sql
 echo '----------------------------------------------------------------------------------------------------------------'

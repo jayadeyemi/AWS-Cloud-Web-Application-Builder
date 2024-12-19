@@ -354,20 +354,20 @@ fi
 
 # Create a key pair for the EC2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 create-key-pair --key-name \"$PUB_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PUB_KEY.$KEY_FORMAT\""
+    execute_command "aws ec2 create-key-pair --key-name \"$PUBLIC_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PUB_KEY\""
     status=$?
 fi
 
 # Set the correct permissions for saving the key pair
 if [[ $status -eq 0 ]]; then
-    execute_command "chmod 400 \"$PUB_KEY.$KEY_FORMAT\""
+    execute_command "chmod 400 \"$PUB_KEY\""
     status=$?
 fi
 
 # Launch the EC2 instance
 if [[ $status -eq 0 ]]; then
     echo "Launching EC2-v1 instance..."
-    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUBLIC_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 

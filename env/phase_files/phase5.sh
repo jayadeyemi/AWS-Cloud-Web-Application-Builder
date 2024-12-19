@@ -16,12 +16,12 @@ check_command_success() {
 }
 
 # Delete key pairs
-for key_name in "$PUB_KEY" "$PRIV_KEY"; do
+for key_name in "$PUBLIC_KEY" "$PRIVATE_KEY"; do
     if [ -n "$key_name" ]; then
         aws ec2 delete-key-pair \
             --key-name "$key_name" || true
         # Reference the current file location
-        rm -f "$SCRIPT_DIR/$key_name.pem" || true
+        rm 
         check_command_success ""
     fi
 done

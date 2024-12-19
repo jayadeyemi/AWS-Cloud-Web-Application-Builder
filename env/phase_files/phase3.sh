@@ -68,7 +68,7 @@ fi
 
 # Create a scaling policy for the autoscaling group
 if [[ $status -eq 0 ]]; then
-    execute_command "ASG_GROUP_POLICY=\$(aws autoscaling put-scaling-policy --policy-name \"ASG_POLICY_NAME\" --auto-scaling-group-name \"$EC2_ASG_NAME\" --policy-type TargetTrackingScaling --target-tracking-configuration file://\"$ASG_config\")"
+    execute_command "ASG_GROUP_POLICY=\$(aws autoscaling put-scaling-policy --policy-name \"ASG_POLICY_NAME\" --auto-scaling-group-name \"$EC2_ASG_NAME\" --policy-type TargetTrackingScaling --target-tracking-configuration file://\"$ASG_CONFIG\")"
     status=$?
 fi
 

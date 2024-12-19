@@ -3,27 +3,13 @@
 ##################################################################################################################
 # Load environment variables and path
 ##################################################################################################################
-
-# load environment variables
-source "$(dirname "$0")/env/variables.env"
-source "$(dirname "$0")/env/constants.env"
-
-# load settings
-source "$(dirname "$0")/env/workers/settings.sh"
-
-# Load functions
-source "$(dirname "$0")/env/workers/functions.sh"
-
-# Instance User Data
-USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
-USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
+source "$(dirname "$0")/env/core/root.sh"
 
 # Setting the region
 aws configure set region "$REGION"
 
 # ASG Target Value Modifier
 sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$(dirname "$0")/env/workers/config.json"
-
 # Obtain DB password
 echo "############################################################################################################"
 echo "# Variables Initialized"
@@ -86,7 +72,7 @@ while true; do
     echo "############################################################################################################"
     repeat="${repeat,,}"
 
-    if [[ "$repeat" == "y" ]]; then
+    if [[ "$repeat" == "n" ]]; then
         source "$(dirname "$0")/env/phase_files/phase5.sh"
         log "$EXECUTION_LOG" "Phase 5 completed."
         read -r -p "# Press [Enter] to restart the script, or Press any other key to exit the script." repeat
