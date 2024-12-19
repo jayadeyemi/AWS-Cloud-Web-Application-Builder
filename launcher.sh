@@ -28,7 +28,7 @@ if [[ "$generate_password" =~ ^[Yy]$ ]]; then
         echo "#"
         read -s -r -p  "# Confirm password: " confirm_password
         if [[ "$SECRET_PASSWORD" == "$confirm_password" && "$SECRET_PASSWORD" != "" ]]; then
-            echo "# Passwords match. Password: $SECRET_PASSWORD"
+            echo "# Passwords match"
             echo "############################################################################################################"
 
             break
@@ -40,7 +40,7 @@ else
     # Generate a random password
 SECRET_PASSWORD=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
 
-echo "# Random password generated: $SECRET_PASSWORD"
+echo "# Random password generated"
 echo "############################################################################################################"
 fi
 
