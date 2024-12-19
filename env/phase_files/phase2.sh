@@ -164,7 +164,7 @@ EOF
 echo '############################################################################################################'
 
 # Step 4: Copy the selected database dump to the EC2 instance v2 (default: sample_entries.sql)
-scp -i "$PRIV_KEY" -o StrictHostKeyChecking=no "$DEFAULT_DB_FILE" ubuntu@"$NEW_INSTANCE_PRIVATE_IP":/tmp/data.sql # Copy the dump to the Cloud9 instance
+scp -i "$PRIV_KEY" -o StrictHostKeyChecking=no "$CHOSEN_DB_FILE" ubuntu@"$NEW_INSTANCE_PRIVATE_IP":/tmp/data.sql # Copy the dump to the Cloud9 instance
 
 # Step 5: Login to the ec2 instance v2 and export the database to RDS
 echo '############################################################################################################'

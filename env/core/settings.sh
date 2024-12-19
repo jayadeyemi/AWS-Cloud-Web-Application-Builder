@@ -1,6 +1,6 @@
-######################################
+####################################################################################################
 # Configuration
-######################################
+####################################################################################################
 
 # Authorize the sub-scripts
 chmod -R +r ./env
@@ -24,9 +24,10 @@ COMMAND_COUNTER=0
 EXECUTION_LOG="$(dirname "$0")/logs/execution.log"
 RESPONSE_LOG="$(dirname "$0")/logs/response.log"
 VARIABLES_LOG="$(dirname "$0")/logs/created_resourses.log"
-DATA_DIR="$(dirname "$0")/env/data/data.sql"
 
-# Instance User Data
+#Data files
+DATA_DIR="$(dirname "$0")/env/data/data.sql"
+DEFAULT_DB_FILE="$(dirname "$0")/env/data/sample_entries.sql"
 USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
 USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 
@@ -37,6 +38,6 @@ PRIV_KEY="$(dirname "$0")/env/keys/$$PRIVATE_KEY.$KEY_FORMAT"
 # ASG Configuration file
 ASG_CONFIG="$(dirname "$0")/env/asg_config/config.json"
 
-#######################################
-# End of env/config/settings.sh
-#######################################
+####################################################################################################
+# End of settings.sh
+####################################################################################################
