@@ -24,6 +24,9 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Retrieve the Default VPC Routes
+    DEFAULT_ROUTES=$(aws ec2 describe-route-tables --route-table-ids "$DEFAULT_ROUTE_TABLE_ID" --query "RouteTables[0].Routes.DestinationCidrBlock" --output text)
+
 # Create a security group for the Cloud9 instance if not found
 if [[ $status -eq 0 ]]; then
     CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids "$CLOUD9_INSTANCE_ID" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)

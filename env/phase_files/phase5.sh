@@ -2,8 +2,9 @@
 ######################################
 # Phase 5: Cleanup
 ######################################
-
-echo "Starting Phase 5: Cleanup"
+echo "############################################################################################################"
+echo "# Starting Phase 5: Cleanup of provisioned Resources"
+echo "############################################################################################################"
 
 # Helper function
 check_command_success() {
@@ -21,23 +22,20 @@ for key_name in "$PUB_KEY" "$PRIV_KEY"; do
             --key-name "$key_name" || true
         # Reference the current file location
         rm -f "$SCRIPT_DIR/$key_name.pem" || true
-        check_command_success "Deleting key pair $key_name"
+        check_command_success ""
     fi
 done
 
 # Scale down ASG before deletion
-if [ -n "$ASG_GROUP" ]; then
-    aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NAME" --min-size 0 --desired-capacity 0 || true
-    check_command_success "Scaling down Auto Scaling Group"
-fi
+aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NAME" --min-size 0 --desired-capacity 0 || true
+check_command_success ""
 
 # Terminate EC2 instances
 for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"
     if [ -n "$instance_id" ]; then
-        aws ec2 terminate-instances \
-            --instance-ids "$instance_id"
-            --output text || true
-        check_command_success "Terminating EC2 instance $instance_id"
+        aws ec2 terminate-instances --instance-ids "$instance_id" --output text > /dev/null 2>&1
+        check_command_success ""
+
     fi
 done
 
@@ -45,69 +43,66 @@ done
 echo "Deleting Launch Template..."
 if aws ec2 describe-launch-templates --launch-template-names "$LAUNCH_TEMPLATE_NAME" >/dev/null 2>&1; then
     aws ec2 delete-launch-template --launch-template-name "$LAUNCH_TEMPLATE_NAME"
-    check_command_success "Deleting Launch Template"
+    check_command_success ""
 fi
 
 # Deregister Server V1 AMI
 if [ -n "$SERVER_V1_IMAGE_ID" ]; then
     aws ec2 deregister-image --image-id "$SERVER_V1_IMAGE_ID"
-    check_command_success "Deregistering AMI $SERVER_V1_IMAGE_ID"
+    check_command_success ""
 fi
 
 # Deregister Server V2 AMI
 if [ -n "$SERVER_V2_IMAGE_ID" ]; then
     aws ec2 deregister-image --image-id "$SERVER_V2_IMAGE_ID"
-    check_command_success "Deregistering AMI $SERVER_V2_IMAGE_ID"
+    check_command_success ""
 fi
 
 # Delete RDS instance
 if aws rds describe-db-instances --db-instance-identifier "$RDS_IDENTIFIER" >/dev/null 2>&1; then
     aws rds delete-db-instance --db-instance-identifier "$RDS_IDENTIFIER" --skip-final-snapshot > /dev/null 2>&1
-    check_command_success "Deleting RDS instance"
+    check_command_success ""
 fi
 
 # Delete Load Balancer and Target Group
 if [ -n "$LB_ARN" ]; then
     aws elbv2 delete-load-balancer --load-balancer-arn "$LB_ARN"
-    check_command_success "Deleting Load Balancer"
+    check_command_success ""
     sleep 30
 fi
 
 # Delete Target Group
 if [ -n "$TG_ARN" ]; then
     aws elbv2 delete-target-group --target-group-arn "$TG_ARN"
-    check_command_success "Deleting Target Group"
+    check_command_success ""
 fi
+
+# List and process ingress rules for the Cloud9 security group
+for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$LB_SG", "$EC2_V1_SG_ID", "$ASG_SG_ID"; do
+    # Retrieve ingress rule IDs for the specified security group
+    rule_ids=$(aws ec2 describe-security-group-rules \
+        --filters Name="group-id",Values="$CLOUD9_SG_ID" Name="is-egress",Values="false" \
+        --query "SecurityGroupRules[?GroupId=='$CLOUD9_SG_ID'].SecurityGroupRuleId" \
+        --output text)
+
+    # Check if there are any rules to revoke
+    if [[ -n "$rule_ids" ]]; then
+        # Revoke the ingress rules
+        aws ec2 revoke-security-group-ingress --group-id "$CLOUD9_SG_ID" --security-group-rule-ids $rule_ids
+        check_command_success ""
+    else
+        echo "No ingress rules found for security group $CLOUD9_SG_ID"
+    fi
+done
 
 # Delete Auto Scaling Group
 if [ -n "$EC2_ASG_NAME" ]; then
     aws autoscaling delete-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NAME" --force-delete
-    check_command_success "Deleting Auto Scaling Group"
+    check_command_success ""
 fi
-# Define the security group IDs
-CLOUD9_SG="your-cloud9-sg-id" # Replace with your actual Cloud9 Security Group ID
-
-# List and process ingress rules for the Cloud9 security group
-for sg_id in "LAB_SG" "RDS_SG" "LB_SG"; do
-# Retrieve ingress rule IDs for the specified security group
-rule_ids=$(aws ec2 describe-security-group-rules \
-    --filters Name="group-id",Values="$CLOUD9_SG" Name="is-egress",Values="false" \
-    --query "SecurityGroupRules[?GroupId=='$CLOUD9_SG'].SecurityGroupRuleId" \
-    --output text)
-
-# Check if there are any rules to revoke
-if [[ -n "$rule_ids" ]]; then
-    # Revoke the ingress rules
-    aws ec2 revoke-security-group-ingress --group-id "$CLOUD9_SG" --security-group-rule-ids $rule_ids
-    echo "Revoked ingress rules: $rule_ids for security group $CLOUD9_SG"
-else
-    echo "No ingress rules found for security group $CLOUD9_SG"
-fi
-done
-
 
 # List of security group IDs
-for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG"; do
+for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG", "$LB_SG", "$ASG_SG"; do
     if [[ -n "$sg_id" ]]; then
         echo "Processing Security Group: $sg_id"
 
@@ -122,7 +117,7 @@ for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG"; do
             for rule in $rule_ids; do
                 # Revoke each rule and log the result
                 if aws ec2 revoke-security-group-ingress --group-id "$sg_id" --security-group-rule-ids "$rule" --output text; then
-                    echo "Successfully revoked rule $rule from $sg_id"
+                    check_command_success ""
                 else
                     echo "Failed to revoke rule $rule from $sg_id" 
                 fi
@@ -135,14 +130,18 @@ for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG"; do
     fi
 done
 
-for sg_id in "$EC2_V1_SG" "$RDS_SG" "$EC2_V2_SG_NAME" "$LB_SG"; do
+for sg_id in "$EC2_V1_SG" "$RDS_SG" "$EC2_V2_SG_NAME" "$LB_SG" "$ASG_SG"; do
     echo "Deleting Security Groups..."
     if [ -n "$sg_id" ]; then
-        aws ec2 delete-security-group \
-            --group-id "$sg_id" || true
-        check_command_success "Deleting Security Group $sg_id"
+        aws ec2 delete-security-group --group-id "$sg_id" || true
+        check_command_success ""
     fi
 done
+# Delete RDS DB Subnet Group
+echo "Deleting DB Subnet Group..."
+aws rds delete-db-subnet-group \
+    --db-subnet-group-name "$DB_SUBNET_GROUP_NAME" || true
+check_command_success ""
 
 # Array of Route Table IDs
 ROUTE_TABLE_IDS=($PUB_ROUTE_TABLE_ID $DEFAULT_ROUTE_TABLE_ID $PRIV_ROUTE_TABLE_ID, $DB_ROUTE_TABLE_ID)
@@ -156,9 +155,15 @@ delete_routes() {
     ROUTES=$(aws ec2 describe-route-tables --route-table-ids "$ROUTE_TABLE_ID" \
         --query "RouteTables[0].Routes[?DestinationCidrBlock!='local'].DestinationCidrBlock" \
         --output text)
+        # Filter ROUTES to exclude DEFAULT_ROUTES
+
+    FILTERED_ROUTES=$(echo "$ROUTES" | tr ' ' '\n' | grep -vxFf <(echo "$DEFAULT_ROUTES" | tr ' ' '\n') | tr '\n' ' ')
+
+    # Trim trailing space and print
+    FILTERED_ROUTES=$(echo "$FILTERED_ROUTES" | sed 's/[[:space:]]*$//')
 
     # Loop through and delete each route
-    for CIDR in $ROUTES; do
+    for CIDR in $FILTERED_ROUTES; do
         echo "Deleting route: $CIDR from Route Table: $ROUTE_TABLE_ID"
         aws ec2 delete-route --route-table-id "$ROUTE_TABLE_ID" --destination-cidr-block "$CIDR"
         if [[ $? -eq 0 ]]; then
@@ -180,13 +185,13 @@ echo "Deleting NAT Gateway..."
 if [ -n "$NAT_GW_ID" ]; then
     aws ec2 delete-nat-gateway --nat-gateway-id "$NAT_GW_ID" || true
     aws ec2 wait nat-gateway-deleted --nat-gateway-ids "$NAT_GW_ID" || true
-    check_command_success "Deleting NAT Gateway"
+    check_command_success ""
 fi
 
 echo "Releasing Elastic IP..."
 if [ -n "$EIP_ALLOC" ]; then
     aws ec2 release-address --allocation-id "$EIP_ALLOC" || true
-    check_command_success "Releasing Elastic IP"
+    check_command_success ""
 fi
 
 echo "Detaching and deleting Internet Gateway..."
@@ -195,19 +200,19 @@ if [ -n "$IGW_ID" ] && [ -n "$MAIN_VPC_ID" ]; then
     aws ec2 detach-internet-gateway --internet-gateway-id "$IGW_ID" --vpc-id "$MAIN_VPC_ID" || true
     sleep 10
     aws ec2 delete-internet-gateway --internet-gateway-id "$IGW_ID" || true
-    check_command_success "Deleting Internet Gateway"
+    check_command_success ""
 fi
 # Delete VPC Peering Connection and Routes
 echo "Deleting Route Tables for VPC Peering Connection..."
 if [ -n "$DEFAULT_ROUTE_TABLE_ID" ]; then
     aws ec2 delete-route --route-table-id "$DEFAULT_ROUTE_TABLE_ID" --destination-cidr-block "$VPC_CIDR" || true
-    check_command_success "Deleting Route Table $DEFAULT_ROUTE_TABLE_ID"
+    check_command_success ""
 fi
 
 echo "Deleting VPC Peering Connection..."
 if [ -n "$PEERING_CONNECTION_ID" ]; then
     aws ec2 delete-vpc-peering-connection --vpc-peering-connection-id "$PEERING_CONNECTION_ID" || true
-    check_command_success "Deleting VPC Peering Connection"
+    check_command_success ""
 fi
 
 # Delete Subnets
@@ -216,30 +221,24 @@ for subnet_id in "$PUB_SUBNET1" "$PUB_SUBNET2" "$PRIV_SUBNET1" "$PRIV_SUBNET2" "
     if [ -n "$subnet_id" ]; then
         aws ec2 delete-subnet \
             --subnet-id "$subnet_id" || true
-        check_command_success "Deleting Subnet $subnet_id"
+    check_command_success ""
     fi
 done
-
-# Delete RDS DB Subnet Group
-echo "Deleting DB Subnet Group..."
-aws rds delete-db-subnet-group \
-    --db-subnet-group-name "$DG_DUBNET_GROUP_NAME" || true
-check_command_success "Deleting RDS DB Subnet Group $DG_DUBNET_GROUP_NAME"
 
 # Delete Route Tables
 if [ -n "$PUB_ROUTE_TABLE_ID" ]; then
     aws ec2 delete-route-table --route-table-id "$PUB_ROUTE_TABLE_ID" || true
-    check_command_success "Deleting Route Table $PUB_ROUTE_TABLE_ID"
+    check_command_success ""
 fi
 
 if [ -n "$PRIV_ROUTE_TABLE_ID" ]; then
     aws ec2 delete-route-table --route-table-id "$PRIV_ROUTE_TABLE_ID" || true
-    check_command_success "Deleting Route Table $PRIV_ROUTE_TABLE_ID"
+    check_command_success ""
 fi
 
 if [ -n "$DB_ROUTE_TABLE_ID" ]; then
     aws ec2 delete-route-table --route-table-id "$DB_ROUTE_TABLE_ID" || true
-    check_command_success "Deleting Route Table $DB_ROUTE_TABLE_ID"
+    check_command_success ""
 fi
 
 # Wait one minute and Delete VPC
@@ -247,6 +246,11 @@ echo "Deleting VPC..."
 if [ -n "$MAIN_VPC_ID" ]; then
     sleep 10
     aws ec2 delete-vpc --vpc-id "$MAIN_VPC_ID" || true
-    check_command_success "Deleting VPC"
+    check_command_success ""
 fi
-echo "Phase 5 Complete: All resources checked and deleted as necessary."
+
+echo "############################################################################################################"
+echo "# DB Secret must not be deleted."
+echo "# VPC needs to be deleted manually."
+echo "# Phase 5: Cleanup complete."
+echo "############################################################################################################"
