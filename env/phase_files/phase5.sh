@@ -66,12 +66,6 @@ if aws rds describe-db-instances --db-instance-identifier "$RDS_IDENTIFIER" >/de
     check_command_success "Deleting RDS instance"
 fi
 
-# Delete RDS Secret
-if [ -n "$SECRET_ARN" ]; then
-    aws secretsmanager delete-secret --secret-id "$SECRET_ARN" --force-delete-without-recovery > /dev/null 2>&1
-    check_command_success "Deleting RDS secret"
-fi
-
 # Delete Load Balancer and Target Group
 if [ -n "$LB_ARN" ]; then
     aws elbv2 delete-load-balancer --load-balancer-arn "$LB_ARN"
