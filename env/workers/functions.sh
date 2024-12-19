@@ -88,7 +88,7 @@ prompt_phase() {
     local timed_out=0
 
     while true; do
-        read -t 300 -r -p "Proceed to Phase ${phase_num} (${phase_name})? (y/n/[Press Enter to skip]): " cont
+        read -t $PHASE_DELAY -r -p "Proceed to Phase ${phase_num} (${phase_name})? (y/n/[Press Enter to skip]): " cont
         # Check if read timed out
         if [[ $? -gt 0 ]]; then
             timed_out=1
