@@ -14,15 +14,15 @@ source "$(dirname "$0")/env/workers/settings.sh"
 # Load functions
 source "$(dirname "$0")/env/workers/functions.sh"
 
-# Load Autoscaling Rule
-ASG_config="$(dirname "$0")/env/workers/config.json"
-
 # Instance User Data
 USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
 USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 
-# Execute Autoscaling Rule using helper function
-$(dirname "$0")/env/workers/helper.sh
+# Setting the region
+aws configure set region "$REGION"
+
+# ASG Target Value Modifier
+sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$(dirname "$0")/env/workers/config.json"
 
 # Obtain DB password
 echo "############################################################################################################"
@@ -33,23 +33,32 @@ echo "##########################################################################
 read -t $DB_Password_wait -r -p "# User Input: " generate_password
 echo "############################################################################################################"
 echo -e "\n\n\n"
+
 if [[ "$generate_password" =~ ^[Yy]$ ]]; then
     # User chooses to input their own password
     while true; do
-        read -r -s "Enter password: " SECRET_PASSWORD
-        read -r -s "Confirm password: " confirm_password
+        read -s -r -p  "# Enter a password: " SECRET_PASSWORD
+        echo "#"
+        read -s -r -p  "# Confirm password: " confirm_password
         if [[ "$SECRET_PASSWORD" == "$confirm_password" && "$SECRET_PASSWORD" != "" ]]; then
-            echo "Passwords match. Password: $SECRET_PASSWORD"
+            echo "# Passwords match. Password: $SECRET_PASSWORD"
+            echo "############################################################################################################"
+
             break
         else
-            echo "Passwords do not match. Please try again."
+            echo "# Passwords do not match. Please try again."
         fi
     done
 else
     # Generate a random password
 SECRET_PASSWORD=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
+
+echo "# Random password generated: $SECRET_PASSWORD"
+echo "############################################################################################################"
 fi
+
 log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
+echo -e "\n\n\n"
 
 #######################################
 # Main loop
@@ -70,8 +79,8 @@ while true; do
 
     # Ask if the script should run again
     echo "############################################################################################################"
-    echo "# Press Enter to restart the script, or"
-    echo "# Press 'y' to run the script again, or"
+    echo "# Press 'n' to clear all resources and exit the script, or"
+    echo "# Press [Enter] to restart the script, or"
     echo "# Press any other key to exit the script."
     read -r -p "# User Input: " repeat
     echo "############################################################################################################"
@@ -80,6 +89,12 @@ while true; do
     if [[ "$repeat" == "y" ]]; then
         source "$(dirname "$0")/env/phase_files/phase5.sh"
         log "$EXECUTION_LOG" "Phase 5 completed."
+        read -r -p "# Press [Enter] to restart the script, or Press any other key to exit the script." repeat
+        
+        if [[ "$repeat" != "" ]]; then
+            log "$EXECUTION_LOG" "Exiting the script."
+            break
+        fi
 
     elif [[ "$repeat" != "" ]]; then
         log "$EXECUTION_LOG" "Exiting the script."

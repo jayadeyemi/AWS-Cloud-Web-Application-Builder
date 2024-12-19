@@ -17,7 +17,7 @@ ELB_URL=$(aws elbv2 describe-load-balancers \
 loadtest \
     --rps 1000 \
     -c 500 \
-    -k "$ELB_URL" || true
+    -k "$LB_DNS" || true
 
 echo "############################################################################################################"
 echo "Load Testing executed"

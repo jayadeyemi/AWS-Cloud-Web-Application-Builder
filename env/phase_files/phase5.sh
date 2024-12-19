@@ -31,7 +31,7 @@ aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NA
 check_command_success ""
 
 # Terminate EC2 instances
-for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"
+for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"; do
     if [ -n "$instance_id" ]; then
         aws ec2 terminate-instances --instance-ids "$instance_id" --output text > /dev/null 2>&1
         check_command_success ""
@@ -76,6 +76,11 @@ if [ -n "$TG_ARN" ]; then
     aws elbv2 delete-target-group --target-group-arn "$TG_ARN"
     check_command_success ""
 fi
+# Delete listener
+if [ -n "$LB_ARN" ]; then
+    aws elbv2 delete-listener --load-balancer-arn "$LB_ARN" --port 80
+    check_command_success ""
+fi
 
 # List and process ingress rules for the Cloud9 security group
 for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$LB_SG", "$EC2_V1_SG_ID", "$ASG_SG_ID"; do
@@ -96,7 +101,7 @@ for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$LB_SG", "$EC2_V1_SG_ID", "$ASG_SG_ID"; 
 done
 
 # Delete Auto Scaling Group
-if [ -n "$EC2_ASG_NAME" ]; then
+if aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$EC2_ASG_NAME" >/dev/null 2>&1; then
     aws autoscaling delete-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NAME" --force-delete
     check_command_success ""
 fi
@@ -143,42 +148,8 @@ aws rds delete-db-subnet-group \
     --db-subnet-group-name "$DB_SUBNET_GROUP_NAME" || true
 check_command_success ""
 
-# Array of Route Table IDs
-ROUTE_TABLE_IDS=($PUB_ROUTE_TABLE_ID $DEFAULT_ROUTE_TABLE_ID $PRIV_ROUTE_TABLE_ID, $DB_ROUTE_TABLE_ID)
-
-# Function to delete all routes in a route table
-delete_routes() {
-    local ROUTE_TABLE_ID=$1
-
-    # Fetch all routes for the given route table
-    echo "Fetching routes for Route Table: $ROUTE_TABLE_ID"
-    ROUTES=$(aws ec2 describe-route-tables --route-table-ids "$ROUTE_TABLE_ID" \
-        --query "RouteTables[0].Routes[?DestinationCidrBlock!='local'].DestinationCidrBlock" \
-        --output text)
-        # Filter ROUTES to exclude DEFAULT_ROUTES
-
-    FILTERED_ROUTES=$(echo "$ROUTES" | tr ' ' '\n' | grep -vxFf <(echo "$DEFAULT_ROUTES" | tr ' ' '\n') | tr '\n' ' ')
-
-    # Trim trailing space and print
-    FILTERED_ROUTES=$(echo "$FILTERED_ROUTES" | sed 's/[[:space:]]*$//')
-
-    # Loop through and delete each route
-    for CIDR in $FILTERED_ROUTES; do
-        echo "Deleting route: $CIDR from Route Table: $ROUTE_TABLE_ID"
-        aws ec2 delete-route --route-table-id "$ROUTE_TABLE_ID" --destination-cidr-block "$CIDR"
-        if [[ $? -eq 0 ]]; then
-            echo "Successfully deleted route: $CIDR"
-        else
-            echo "Failed to delete route: $CIDR"
-        fi
-    done
-}
-
-# Loop through each route table and delete routes
-for RT_ID in "${ROUTE_TABLE_IDS[@]}"; do
-    echo "Processing Route Table: $RT_ID"
-    delete_routes "$RT_ID"
-done
+aws ec2 delete-route --route-table-id "$ROUTE_TABLE_ID" --destination-cidr-block "$VPC_CIDR"
+check_command_success ""
 
 # Delete NAT Gateway and Elastic IP
 echo "Deleting NAT Gateway..."
