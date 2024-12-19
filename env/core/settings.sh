@@ -21,10 +21,12 @@ PHASE_DELAY=60
 COMMAND_COUNTER=0
 
 #Path to key pair
-PUB_KEY="$(dirname "$0")/env/keys/$$PUBLIC_KEY.$KEY_FORMAT"
-PRIV_KEY="$(dirname "$0")/env/keys/$$PRIVATE_KEY.$KEY_FORMAT"
+mkdir -p $(dirname "$0")/env/keys/
+PUB_KEY="$(dirname "$0")/env/keys/$PUBLIC_KEY.$KEY_FORMAT"
+PRIV_KEY="$(dirname "$0")/env/keys/$PRIVATE_KEY.$KEY_FORMAT"
 
 # Log files
+mkdir -p $(dirname "$0")/logs/
 EXECUTION_LOG="$(dirname "$0")/logs/execution.log"
 RESPONSE_LOG="$(dirname "$0")/logs/response.log"
 VARIABLES_LOG="$(dirname "$0")/logs/created_resourses.log"

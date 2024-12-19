@@ -12,8 +12,7 @@ source "$(dirname "$0")/env/constants.env"
 source "$(dirname "$0")/env/core/settings.sh"
 
 # Load functions
-source "$(dirname "$0")/env/core/functions.sh"
-
+source "$(dirname "$0")/env/core/workers.sh"
 
 ####################################################################################################
 # Main Worker Script

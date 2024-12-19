@@ -10,7 +10,7 @@ source "$(dirname "$0")/env/core/root.sh"
 aws configure set region "$REGION"
 
 # ASG Target Value Modifier
-sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$(dirname "$0")/env/workers/config.json"
+sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$ASG_CONFIG"
 # Obtain DB password
 echo "############################################################################################################"
 echo "# Variables Initialized"
