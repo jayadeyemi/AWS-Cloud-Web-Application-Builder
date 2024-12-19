@@ -390,6 +390,17 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Create an image of the new EC2-v1 instance for backup
+if [[ $status -eq 0 ]]; then
+    execute_command "SERVER_V1_IMAGE_ID=\$(aws ec2 create-image --instance-id \"$INSTANCE_ID\" --name \"$EC2_IMAGE1_NAME\" --query 'ImageId' --output text)"
+    status=$?
+fi
+
+if [[ $status -eq 0 ]]; then
+    execute_command "aws ec2 wait image-available --image-ids \"$SERVER_V1_IMAGE_ID\""
+    status=$?
+fi
+
 if [[ $status -eq 0 ]]; then
     echo -e "\n\n\n"
     echo "############################################################################################################"
