@@ -20,13 +20,13 @@ fi
 
 # Retrieve the DEFAULT VPC Route Table ID
 if [[ $status -eq 0 ]]; then
-    execute_command "DEFAULT_ROUTE_TABLE_ID=\$(aws ec2 describe-route-tables --filters 'Name=vpc-id,Values=$DEFAULT_VPC_ID' --query 'RouteTables[?Associations[0].Main].RouteTableId' --output text)"
+    execute_command "DEFAULT_ROUTE_TABLE_ID=\$(aws ec2 describe-route-tables --filters 'Name=vpc-id,Values="$DEFAULT_VPC_ID"' --query 'RouteTables[?Associations[0].Main].RouteTableId' --output text)"
     status=$?
 fi
 
 # Create a security group for the Cloud9 instance if not found
 if [[ $status -eq 0 ]]; then
-    CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
+    CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids "$CLOUD9_INSTANCE_ID" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
 fi
 
 # Check if the Cloud9 security group is found
@@ -40,7 +40,7 @@ if [[ $status -eq 0 ]]; then
             ((attempt++))
             echo "Attempt $attempt of $MAX_ATTEMPTS"
             read -p "Enter the correct Cloud9 instance ID: " CLOUD9_INSTANCE_ID
-            CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids \"$CLOUD9_INSTANCE_ID\" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
+            CLOUD9_SG_ID=$(aws ec2 describe-instances --instance-ids "$CLOUD9_INSTANCE_ID" --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
             status=$?
             if [[ $status -ne 0 ]]; then
                 echo "Failed to retrieve security group ID for instance ID: $CLOUD9_INSTANCE_ID. Please try again."
@@ -362,7 +362,7 @@ fi
 # Launch the EC2 instance
 if [[ $status -eq 0 ]]; then
     echo "Launching EC2-v1 instance..."
-    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data \"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PUB_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V1\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V1_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 

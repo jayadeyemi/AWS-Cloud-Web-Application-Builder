@@ -63,11 +63,11 @@ while true; do
 
 
     # Execute each phase
-    prompt_phase 1 "$(dirname "$0")/env/phase_files/phase1.sh" "Phase 1 - 1st Instance Deployment" || continue
-    prompt_phase 2 "$(dirname "$0")/env/phase_files/phase2.sh" "Phase 2 - 2nd Instance Deployment" || continue
-    prompt_phase 3 "$(dirname "$0")/env/phase_files/phase3.sh" "Phase 3 - Autoscaling Group Deployment" || continue
-    prompt_phase 4 "$(dirname "$0")/env/phase_files/phase4.sh" "Phase 4 - Load-Tester for the Autoscaling Group" || continue
-    prompt_phase 5 "$(dirname "$0")/env/phase_files/phase5.sh" "Phase 5 - Cleanup Function" || continue
+    prompt_phase 1 "$(dirname "$0")/env/phase_files/phase1.sh" "1st Instance Deployment" || continue
+    prompt_phase 2 "$(dirname "$0")/env/phase_files/phase2.sh" "2nd Instance Deployment" || continue
+    prompt_phase 3 "$(dirname "$0")/env/phase_files/phase3.sh" "Autoscaling Group Deployment" || continue
+    prompt_phase 4 "$(dirname "$0")/env/phase_files/phase4.sh" "Load-Tester for the Autoscaling Group" || continue
+    prompt_phase 5 "$(dirname "$0")/env/phase_files/phase5.sh" "Cleanup Function" || continue
     log "$EXECUTION_LOG" "All phases have been processed."
 
     # Ask if the script should run again

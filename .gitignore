@@ -3,3 +3,11 @@
 AWS-Projects.code-workspace
 /.vscode
 install.sh
+
+Private-EC2-KeyPair.ppk
+Public-EC2-KeyPair.ppk
+
+execution.log
+response.log
+created_resources.log
+
