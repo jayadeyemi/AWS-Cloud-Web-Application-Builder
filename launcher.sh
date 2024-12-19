@@ -1,8 +1,9 @@
 #!/bin/bash
 
 ##################################################################################################################
-# Load environment variables and path
+# Root Launcher and Password Input
 ##################################################################################################################
+
 source "$(dirname "$0")/env/core/root.sh"
 
 # Setting the region
@@ -46,51 +47,52 @@ fi
 log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
 echo -e "\n\n\n"
 
-#######################################
+##################################################################################################################
 # Main loop
-#######################################
+##################################################################################################################
 
-# The loop will continue to execute until it is manually stopped.
-while true; do
-    echo "############################################################################################################"
-    echo "# Prompts to Execute Phases 1-5"
-    echo "############################################################################################################"
+# This script continuously loops to execute all phases until manually stopped
+main_launcher() {
+    while true; do
+        echo "############################################################################################################"
+        echo "# Prompts to Execute Phases 1-5"
+        echo "############################################################################################################"
 
-    # Execute each phase
-    prompt_phase 1 "$(dirname "$0")/env/phase_files/phase1.sh" "1st Instance Deployment" || continue
-    prompt_phase 2 "$(dirname "$0")/env/phase_files/phase2.sh" "2nd Instance Deployment" || continue
-    prompt_phase 3 "$(dirname "$0")/env/phase_files/phase3.sh" "Autoscaling Group Deployment" || continue
-    prompt_phase 4 "$(dirname "$0")/env/phase_files/phase4.sh" "Load-Tester for the Autoscaling Group" || continue
-    log "$EXECUTION_LOG" "All phases have been processed."
+        # Execute each phase
+        execute_phase 1 "$PHASE_1_SCRIPT" "1st Instance Deployment" || continue
+        execute_phase 2 "$PHASE_2_SCRIPT" "2nd Instance Deployment" || continue
+        execute_phase 3 "$PHASE_3_SCRIPT" "Autoscaling Group Deployment" || continue
+        execute_phase 4 "$PHASE_4_SCRIPT" "Load-Tester for the Autoscaling Group" || continue
+        log "$EXECUTION_LOG" "All phases have been processed."
 
-    # Ask if the script should run again
-    echo "############################################################################################################"
-    echo "# Press 'n' to clear all resources and exit the script, or"
-    echo "# Press [Enter] to restart the script, or"
-    echo "# Press any other key to exit the script."
-    read -r -p "# User Input: " repeat
-    echo "############################################################################################################"
-    repeat="${repeat,,}"
+        # Ask if the script should run again
+        echo "############################################################################################################"
+        echo "# Press 'n' to clear all resources and exit the script, or"
+        echo "# Press [Enter] to restart the script, or"
+        echo "# Press any other key to exit the script."
+        read -r -p "# User Input: " repeat
+        echo "############################################################################################################"
+        repeat="${repeat,,}"
 
-    if [[ "$repeat" == "n" ]]; then
-        source "$(dirname "$0")/env/phase_files/phase5.sh"
-        log "$EXECUTION_LOG" "Phase 5 completed."
-        read -r -p "# Press [Enter] to restart the script, or Press any other key to exit the script." repeat
-        
-        if [[ "$repeat" != "" ]]; then
+        if [[ "$repeat" == "n" ]]; then
+            execute_phase 5 "$PHASE_5_SCRIPT" "Clear Resources"
+            log "$EXECUTION_LOG" "Phase 5 completed."
+            read -r -p "# Press [Enter] to continue back to phase #1, or Press any other key to exit the script." repeat
+            
+            if [[ "$repeat" != "" ]]; then
+                log "$EXECUTION_LOG" "Exiting the script."
+                break
+            fi
+
+        elif [[ "$repeat" != "" ]]; then
             log "$EXECUTION_LOG" "Exiting the script."
             break
         fi
+    done
+}
 
-    elif [[ "$repeat" != "" ]]; then
-        log "$EXECUTION_LOG" "Exiting the script."
-        break
-    fi
-done
-echo "############################################################################################################"
-echo "# End of Script"
-echo "############################################################################################################"
-
+# Run the main launcher
+main_launcher
 ##################################################################################################################
 # End of launcher.sh
 ##################################################################################################################
