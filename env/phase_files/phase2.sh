@@ -1,10 +1,12 @@
 #!/bin/bash
 
+# status=0
 ######################################
 # Phase 2: Database Migration to RDS, EC2 Image Creation, and v2 Launch
 ######################################
 
 echo -e "\n\n\n"
+echo "-------------------------------------------------------------------------------------------------------------"
 echo "############################################################################################################"
 echo "# Starting Phase 2: Migration to RDS"
 echo "# Version #2 Application Launch for communication with RDS"
@@ -80,17 +82,13 @@ fi
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
-<<<<<<< Updated upstream
-    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V1_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data \"$USER_DATA_FILE_V2\" --iam-instance-profile Name=$INVENTORY_SERVER_ROLE --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$EC2_V2_NAME}]\" --query 'Instances[0].InstanceId' --output text)"
-=======
     execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIV_KEY\" --security-group-ids \"$EC2_V2_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=\"$INVENTORY_SERVER_ROLE\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V2_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
->>>>>>> Stashed changes
     status=$?
 fi
 
 # Create a Single Availability Zone RDS Instance
 if [[ $status -eq 0 ]]; then
-    execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DB_SUBNET_GROUP_NAME\" --availability-zone $AVAILABILITY_ZONE1 --master-username $SECRET_USERNAME --master-user-password $SECRET_PASSWORD --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
+    execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DB_SUBNET_GROUP_NAME\" --availability-zone \"$AVAILABILITY_ZONE1\" --master-username \"$SECRET_USERNAME\" --master-user-password \"$SECRET_PASSWORD\" --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
     status=$?
 fi
 
@@ -106,10 +104,22 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Query to check if the secret exists
+if [[ $status -eq 0 ]]; then
+        execute_command "SECRET_EXISTS=\$(aws secretsmanager list-secrets --filter Key="name",Values=\"$SECRET_NAME\" --output text)"
+        status=$?
+fi
+
 # Create a new Secret for RDS
 if [[ $status -eq 0 ]]; then
+    if [[ -n "$SECRET_EXISTS" ]]; then
+        echo "Secret exists. Modifying contents..."
+        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"username\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
+        status=$?
+    else
     execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"username\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
     status=$?
+    fi
 fi
 
 # Get the new EC2-v2 instance Public IP
@@ -130,7 +140,10 @@ if [[ $status -eq 0 ]]; then
     echo '############################################################################################################'
     ssh -t -i "$SCRIPT_DIR/$PUB_KEY.pem" -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_PRIVATE_IP" << EOF
     echo '----------------------------------------------------------------------------------------------------------------'
+    echo '----------------------------------File is being imported to Cloud9----------------------------------------------'
+    echo '----------------------------------------------------------------------------------------------------------------'
     mysqldump -u nodeapp -pstudent12 --databases STUDENTS > /tmp/data.sql # Export the database
+    echo '----------------------------------------------------------------------------------------------------------------'
     echo '----------------------------------------------------------------------------------------------------------------'
 EOF
     echo '############################################################################################################'
@@ -142,7 +155,10 @@ scp -i "$SCRIPT_DIR/$PUB_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$INSTANCE_
 echo '############################################################################################################'
 ssh -t -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
+echo '----------------------------------File is being exported to EC2 v2----------------------------------------------'
+echo '----------------------------------------------------------------------------------------------------------------'
 mysql -h $RDS_ENDPOINT -u $SECRET_USERNAME -p$SECRET_PASSWORD -e 'CREATE DATABASE STUDENTS' # Create the database
+echo '----------------------------------------------------------------------------------------------------------------'
 echo '----------------------------------------------------------------------------------------------------------------'
 EOF
 echo '############################################################################################################'
@@ -154,7 +170,10 @@ scp -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no "$SCRIPT_DIR/$DEF
 echo '############################################################################################################'
 ssh -t -i "$SCRIPT_DIR/$PRIV_KEY".pem -o StrictHostKeyChecking=no ubuntu@"$NEW_INSTANCE_PRIVATE_IP" << EOF # Login to instance 2
 echo '----------------------------------------------------------------------------------------------------------------'
+echo '--------------------------EC2 v2 is exporting file to RDS-------------------------------------------------------'
+echo '----------------------------------------------------------------------------------------------------------------'
 mysql -h "$RDS_ENDPOINT" -u "$SECRET_USERNAME" -p"$SECRET_PASSWORD" STUDENTS < /tmp/data.sql
+echo '----------------------------------------------------------------------------------------------------------------'
 echo '----------------------------------------------------------------------------------------------------------------'
 EOF
 echo '############################################################################################################'
@@ -190,17 +209,19 @@ fi
 if [[ $status -eq 0 ]]; then
     echo -e "\n\n\n"
     echo "############################################################################################################"
-    echo "# Phase 2 Complete: EC2-v2 Public IP - $NEW_INSTANCE_PUBLIC_IP"
+    echo "# Phase 2 Complete:"
     echo "# Please wait 5 minutes for the web application to be fully operational."
     echo "# You can access the application at http://$NEW_INSTANCE_PUBLIC_IP"
     echo "# The instance needs to be fully operational before proceeding to Phase 3."
-    echo "RDS Endpoint - $RDS_ENDPOINT"
-    echo "# EC2-v2 Image ID - $SERVER_V2_IMAGE_ID"
+    # echo "RDS Endpoint - $RDS_ENDPOINT"
+    # echo "# EC2-v2 Image ID - $SERVER_V2_IMAGE_ID"
     echo "############################################################################################################"
+    echo "-------------------------------------------------------------------------------------------------------------"
 else
     echo -e "\n\n\n"
     echo "############################################################################################################"
     echo "# Phase 2 Failed: Please check the last error message above."
     echo "# Please check log files dumped in the Cloud9 directory for more information."
     echo "############################################################################################################"
+    echo "-------------------------------------------------------------------------------------------------------------"
 fi

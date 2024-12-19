@@ -94,9 +94,8 @@ prompt_phase() {
             log "$EXECUTION_LOG" "Executing Phase ${phase_num} (${phase_name})..."
             source "$phase_file"
             if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "Phase ${phase_num} failed. Proceeding to cleanup."
-                source "$(dirname "$0")/../phase_files/phase5.sh"
-                return 1
+                log "$EXECUTION_LOG" "Phase ${phase_num} failed."
+                return 0
             fi
             break
         elif [[ "$cont" == "n" ]]; then

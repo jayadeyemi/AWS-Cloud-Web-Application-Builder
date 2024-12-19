@@ -32,7 +32,7 @@ if [ -n "$ASG_GROUP" ]; then
 fi
 
 # Terminate EC2 instances
-for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"; do
+for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"
     if [ -n "$instance_id" ]; then
         aws ec2 terminate-instances \
             --instance-ids "$instance_id"
@@ -64,12 +64,6 @@ fi
 if aws rds describe-db-instances --db-instance-identifier "$RDS_IDENTIFIER" >/dev/null 2>&1; then
     aws rds delete-db-instance --db-instance-identifier "$RDS_IDENTIFIER" --skip-final-snapshot > /dev/null 2>&1
     check_command_success "Deleting RDS instance"
-fi
-
-# Delete RDS Secret
-if [ -n "$SECRET_ARN" ]; then
-    aws secretsmanager delete-secret --secret-id "$SECRET_ARN" --force-delete-without-recovery > /dev/null 2>&1
-    check_command_success "Deleting RDS secret"
 fi
 
 # Delete Load Balancer and Target Group
