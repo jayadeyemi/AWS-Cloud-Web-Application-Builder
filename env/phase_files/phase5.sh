@@ -32,7 +32,7 @@ if [ -n "$ASG_GROUP" ]; then
 fi
 
 # Terminate EC2 instances
-for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"; do
+for instance_id in "$INSTANCE_ID" "$NEW_INSTANCE_ID"
     if [ -n "$instance_id" ]; then
         aws ec2 terminate-instances \
             --instance-ids "$instance_id"
