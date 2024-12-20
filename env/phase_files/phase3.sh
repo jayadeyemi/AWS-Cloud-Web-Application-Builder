@@ -1,9 +1,13 @@
 #!/bin/bash
 
-# Initialize status variable to track failures
 # status=0
 
-# "---------------------------------------------------------------------------------------------------------"
+############################################################################################################
+# Phase 3: Auto Scaling and Load Balancer Setup 
+############################################################################################################
+
+echo -e "\n\n\n"
+echo "---------------------------------------------------------------------------------------------------------"
 echo "############################################################################################################"
 echo "# Starting Phase 3: Load Balancer and Auto Scaling Setup"
 echo "############################################################################################################"
@@ -40,7 +44,7 @@ if [[ $status -eq 0 ]]; then
 fi
 # Authorize Access from ASG Security Group to DB Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "ASG_SG_DB_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$ASG_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
+    execute_command "DB_SG_ASG_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG_ID\" --protocol tcp --port 3306 --source-group \"$ASG_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
     status=$?
 fi
 # Create a target group for the load balancer
@@ -64,7 +68,7 @@ fi
 
 # Create an autoscaling group and attach the target group
 if [[ $status -eq 0 ]]; then
-    execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group --auto-scaling-group-name \"$ASG_NAME\" --launch-template LaunchTemplateId=\"$LAUNCH_TEMPLATE_ID\",Version=1 --min-size 2 --max-size 6 --desired-capacity 2 --target-group-arns \"$TG_ARN\" --vpc-zone-identifier \"$PRIV_SUBNET1,$PRIV_SUBNET2\" --health-check-type ELB --health-check-grace-period 300)"
+    execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group --auto-scaling-group-name \"$ASG_NAME\" --launch-template LaunchTemplateId=\"$LAUNCH_TEMPLATE_ID\",Version=1 --min-size 2 --max-size 6 --desired-capacity 2 --target-group-arns \"$TG_ARN\" --vpc-zone-identifier \"$PRIV_SUBNET1,$PRIV_SUBNET2\" --health-check-type ELB --health-check-grace-period 300 --tags Key=Name,Value=\"$ASG_NAME\",PropagateAtLaunch=true)"
     status=$?
 fi
 
@@ -102,3 +106,8 @@ else
     echo "############################################################################################################"
     echo "-------------------------------------------------------------------------------------------------------------"
 fi
+echo -e "\n\n\n"
+
+############################################################################################################
+# End of Phase 3
+############################################################################################################

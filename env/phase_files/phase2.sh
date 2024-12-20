@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # status=0
-######################################
+
+############################################################################################################
 # Phase 2: Database Migration to RDS, EC2 Image Creation, and v2 Launch
-######################################
+############################################################################################################
 
 echo -e "\n\n\n"
 echo "-------------------------------------------------------------------------------------------------------------"
@@ -13,6 +14,25 @@ echo "# Version #2 Application Launch for communication with RDS"
 echo "# Server v1 image backup and termination"
 echo "############################################################################################################"
 echo -e "\n\n\n"
+
+
+# Query to check if the secret exists
+if [[ $status -eq 0 ]]; then
+        execute_command "SECRET_EXISTS=\$(aws secretsmanager list-secrets --filter Key="name",Values=\"$SECRET_NAME\" --output text)"
+        status=$?
+fi
+
+# Create a new Secret for RDS
+if [[ $status -eq 0 ]]; then
+    if [[ -n "$SECRET_EXISTS" ]]; then
+        echo "Secret exists. Modifying contents..."
+        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
+        status=$?
+    else
+    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
+    status=$?
+    fi
+fi
 
 # Create Database Subnet Group and attach DB Private Subnets
 if [[ $status -eq 0 ]]; then
@@ -44,21 +64,9 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Authorize SSH access to the Cloud9 security group from the EC2-V2 security group
-if [[ $status -eq 0 ]]; then
-    execute_command "CLOUD9_SG_EC2_V2_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V2_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
-    status=$?
-fi
-
 # Authorize HTTP access to the EC2-V2 security group from the Internet
 if [[ $status -eq 0 ]]; then
     execute_command "EC2_V2_SG_INTERNET_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V2_SG_ID\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
-    status=$?
-fi
-
-# Authorize RDS Security Group access to EC2-v2 Security Group
-if [[ $status -eq 0 ]]; then
-    execute_command "EC2_V1_SG_RDS_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V2_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
@@ -72,24 +80,6 @@ fi
 if [[ $status -eq 0 ]]; then
     execute_command "aws ec2 create-key-pair --key-name \"$PRIVATE_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY\""
     status=$?
-fi
-
-# Query to check if the secret exists
-if [[ $status -eq 0 ]]; then
-        execute_command "SECRET_EXISTS=\$(aws secretsmanager list-secrets --filter Key="name",Values=\"$SECRET_NAME\" --output text)"
-        status=$?
-fi
-
-# Create a new Secret for RDS
-if [[ $status -eq 0 ]]; then
-    if [[ -n "$SECRET_EXISTS" ]]; then
-        echo "Secret exists. Modifying contents..."
-        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
-        status=$?
-    else
-    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
-    status=$?
-    fi
 fi
 
 # Get the new EC2-v2 instance Public IP
@@ -224,3 +214,8 @@ else
     echo "############################################################################################################"
     echo "-------------------------------------------------------------------------------------------------------------"
 fi
+echo -e "\n\n\n"
+
+############################################################################################################
+# End of Phase 2
+############################################################################################################
