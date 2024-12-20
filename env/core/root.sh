@@ -79,25 +79,26 @@ main_launcher() {
         echo "############################################################################################################"
         echo "#                                        Clean Resources?                                                  #"
         echo "############################################################################################################"
-        echo "# Type 'y' to proceed to Phase ${phase_num},"
-        echo "# Type 'n' to exit, or"
+        echo "# Type 'y' to proceed to Phase 5"
+        echo "# Type 'n' to exit"
         echo "# [Press Enter to skip]"
         read -r -p "# User Input: " repeat
         echo "############################################################################################################"
         repeat="${repeat,,}"
 
         if [[ "$repeat" == "y" ]]; then
-            # execute_phase 5 "$PHASE_5_SCRIPT" "Clear Resources"
-            execute_phase 5 "$MAP_BUILD" "# Clear Resources"
+            execute_phase 5 "$PHASE_5_SCRIPT" "Resource Deletion"
+            # execute_phase 5 "$MAP_BUILD" "Resource Deletion"
             return 0
-            read -r -p "# Press [Enter] to continue back to phase #1, or Type "n" to exit the script" repeat           
+            read -r -p "# Press [Enter] to continue back to phase #1, or Type 'n' to exit the script" repeat           
             if [[ "$repeat" == "n" ]]; then
                 log "$EXECUTION_LOG" "# Exiting the script." 
                 break
             elif [[ -z "$repeat" ]]; then
                 log "$EXECUTION_LOG" "# returning to phase 1."
             else
-                echo "3 Invalid input. returning to phase 1."
+                echo "Invalid input. returning to phase 1."
+            fi
         elif [[ "$repeat" == "n" ]]; then
             log "$EXECUTION_LOG" "# Exiting the script."
             break

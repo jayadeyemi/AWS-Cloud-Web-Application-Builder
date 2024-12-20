@@ -8,6 +8,9 @@ echo "##########################################################################
 echo "# Starting Phase 5: Cleanup of provisioned Resources"
 echo "############################################################################################################"
 echo -e "\n\n\n"
+
+# Authorize files to be created
+chmod +x "$CLEANER_DIR"
 # Helper function
 check_command_success() {
     if [ $? -eq 0 ]; then
@@ -236,46 +239,7 @@ if [ -n "$MAIN_VPC_ID" ]; then
     check_command_success "Delete VPC $MAIN_VPC_ID"
 fi
 EOF
-
-# Make the scripts executable
-export $PUBLIC_KEY
-export $PRIVATE_KEY
-export $ASG_NAME
-export $ASG_SG_ID
-export $INSTANCE_ID
-export $NEW_INSTANCE_ID
-export $LAUNCH_TEMPLATE_NAME
-export $SERVER_V1_IMAGE_ID
-export $SERVER_V2_IMAGE_ID
-export $RDS_IDENTIFIER
-export $RDS_SG
-export $RDS_SG_ID
-export $DB_SUBNET_GROUP_NAME
-export $LB_ARN
-export $TG_ARN
-export $LB_SG
-export $LB_SG_ID
-export $EC2_V1_SG_ID
-export $EC2_V2_SG_ID
-export $CLOUD9_SG_ID
-export $NAT_GW_ID
-export $EIP_ALLOC
-export $IGW_ID
-export $MAIN_VPC_ID
-export $DEFAULT_ROUTE_TABLE_ID
-export $VPC_CIDR
-export $PEERING_CONNECTION_ID
-export $PUB_SUBNET1
-export $PUB_SUBNET2
-export $PRIV_SUBNET1
-export $PRIV_SUBNET2
-export $DB_SUBNET1
-export $DB_SUBNET2
-export $PUB_ROUTE_TABLE_ID
-export $PRIV_ROUTE_TABLE_ID
-export $DB_ROUTE_TABLE_ID
-export $CLEANER_DIR
-
+wait 20
 # Make the scripts executable
 chmod +x "$CLEANER_DIR"/*.sh
 # Execute the caller script

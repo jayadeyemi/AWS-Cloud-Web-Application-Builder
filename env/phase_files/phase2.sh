@@ -64,6 +64,12 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Authorize SSH from to Cloud9 security group from EC2-V2 security group
+if [[ $status -eq 0 ]]; then
+    execute_command "CLOUD9_SG_EC2_V2_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$CLOUD9_SG_ID\" --protocol tcp --port 22 --source-group \"$EC2_V2_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    status=$?
+fi
+
 # Authorize HTTP access to the EC2-V2 security group from the Internet
 if [[ $status -eq 0 ]]; then
     execute_command "EC2_V2_SG_INTERNET_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V2_SG_ID\" --protocol tcp --port 80 --cidr \"$INTERNET_CIDR\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
@@ -72,7 +78,13 @@ fi
 
 # Authorize EC2-v2 Security Group access to RDS Security Group
 if [[ $status -eq 0 ]]; then
-    execute_command "RDS_SG_EC2_V2_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG_ID\" --protocol tcp --port 3306 --source-group \"$EC2_V2_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
+    execute_command "RDS_SG_EC2_V2_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$RDS_SG_ID\" --protocol tcp --port 3306 --source-group \"$EC2_V2_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
+    status=$?
+fi
+
+# Authorize RDS Security Group access to EC2-v2 Security Group
+if [[ $status -eq 0 ]]; then
+    execute_command "EC2_V2_SG_RDS_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$EC2_V2_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRules[0].SecurityGroupRuleId' --output text)"
     status=$?
 fi
 
@@ -82,11 +94,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Get the new EC2-v2 instance Public IP
-if [[ $status -eq 0 ]]; then
-    execute_command "NEW_INSTANCE_PUBLIC_IP=\$(aws ec2 describe-instances --instance-ids \"$NEW_INSTANCE_ID\" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)"
-    status=$?
-fi
 # Set permissions for saving the private key
 if [[ $status -eq 0 ]]; then
     execute_command "chmod 400 \"$PRIV_KEY\""
@@ -114,6 +121,12 @@ fi
 # Get the RDS endpoint
 if [[ $status -eq 0 ]]; then
     execute_command "RDS_ENDPOINT=\$(aws rds describe-db-instances --db-instance-identifier \"$RDS_INSTANCE\" --query 'DBInstances[0].Endpoint.Address' --output text)"
+    status=$?
+fi
+
+# Get the new EC2-v2 instance Public IP
+if [[ $status -eq 0 ]]; then
+    execute_command "NEW_INSTANCE_PUBLIC_IP=\$(aws ec2 describe-instances --instance-ids \"$NEW_INSTANCE_ID\" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)"
     status=$?
 fi
 
