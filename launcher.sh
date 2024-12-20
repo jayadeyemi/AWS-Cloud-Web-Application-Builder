@@ -18,8 +18,7 @@ phase_worker_sh="$(dirname "$0")/env/core/phase_worker.sh"
 
 #Path to key pair
 mkdir -p $(dirname "$0")/env/keys/
-PUB_KEY="$(dirname "$0")/env/keys/$PUBLIC_KEY.$KEY_FORMAT"
-PRIV_KEY="$(dirname "$0")/env/keys/$PRIVATE_KEY.$KEY_FORMAT"
+DB_DR="$(dirname "$0")/env/keys/"
 
 # Log files
 mkdir -p $(dirname "$0")/logs/
@@ -29,7 +28,7 @@ VARIABLES_LOG="$(dirname "$0")/logs/created_resourses.log"
 
 #Data files
 DATA_DIR="$(dirname "$0")/env/data/data.sql"
-CHOSEN_DB_FILE="$(dirname "$0")/env/data/$CHOSEN_DB"
+DB_DR="$(dirname "$0")/env/data/"
 USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
 USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 

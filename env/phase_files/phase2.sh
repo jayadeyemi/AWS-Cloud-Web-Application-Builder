@@ -22,18 +22,6 @@ if [[ $status -eq 0 ]]; then
         status=$?
 fi
 
-# Create a new Secret for RDS
-if [[ $status -eq 0 ]]; then
-    if [[ -n "$SECRET_EXISTS" ]]; then
-        echo "Secret exists. Modifying contents..."
-        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
-        status=$?
-    else
-    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
-    status=$?
-    fi
-fi
-
 # Create Database Subnet Group and attach DB Private Subnets
 if [[ $status -eq 0 ]]; then
     execute_command "DB_SUBNET_GROUP_DETAILS=\$(aws rds create-db-subnet-group --db-subnet-group-name \"$DB_SUBNET_GROUP_NAME\" --db-subnet-group-description \"Inventory RDS Subnet Group\" --subnet-ids \"$DB_SUBNET1\" \"$DB_SUBNET2\" --output text)"
@@ -99,16 +87,28 @@ if [[ $status -eq 0 ]]; then
     execute_command "chmod 400 \"$PRIV_KEY\""
     status=$?
 fi
+# Create a Single Availability Zone RDS Instance
+if [[ $status -eq 0 ]]; then
+    execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DB_SUBNET_GROUP_NAME\" --availability-zone \"$AVAILABILITY_ZONE1\" --master-username \"$SECRET_USERNAME\" --master-user-password \"$SECRET_PASSWORD\" --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
+    status=$?
+fi
+
+# Create a new Secret for RDS
+if [[ $status -eq 0 ]]; then
+    if [[ -n "$SECRET_EXISTS" ]]; then
+        echo "Secret exists. Modifying contents..."
+        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
+        status=$?
+    else
+    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
+    status=$?
+    fi
+fi
+
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
     execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIVATE_KEY\" --security-group-ids \"$EC2_V2_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=\"$INVENTORY_SERVER_ROLE\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V2_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
-    status=$?
-fi
-
-# Create a Single Availability Zone RDS Instance
-if [[ $status -eq 0 ]]; then
-    execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DB_SUBNET_GROUP_NAME\" --availability-zone \"$AVAILABILITY_ZONE1\" --master-username \"$SECRET_USERNAME\" --master-user-password \"$SECRET_PASSWORD\" --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
     status=$?
 fi
 
