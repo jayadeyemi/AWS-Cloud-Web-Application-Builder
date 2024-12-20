@@ -82,7 +82,7 @@ fi
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
-    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIVATE_KEY\" --security-group-ids \"$EC2_V2_SG_ID\" --subnet-id \"$PRIV_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=\"$INVENTORY_SERVER_ROLE\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V2_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
+    execute_command "NEW_INSTANCE_ID=\$(aws ec2 run-instances --image-id \"$AMI_ID\" --count 1 --instance-type t2.micro --key-name \"$PRIVATE_KEY\" --security-group-ids \"$EC2_V2_SG_ID\" --subnet-id \"$PUB_SUBNET1\" --user-data file://\"$USER_DATA_FILE_V2\" --iam-instance-profile Name=\"$INVENTORY_SERVER_ROLE\" --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=\"$EC2_V2_NAME\"}]\" --query 'Instances[0].InstanceId' --output text)"
     status=$?
 fi
 
