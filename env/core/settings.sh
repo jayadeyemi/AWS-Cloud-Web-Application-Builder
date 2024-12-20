@@ -20,8 +20,6 @@ PHASE_DELAY=60
 # Command counter for logging
 COMMAND_COUNTER=0
 
-# DB_FILE
-CHOSEN_DB_FILE="$DEFAULT_DB_FILE"
 #Path to key pair
 mkdir -p $(dirname "$0")/env/keys/
 PUB_KEY="$(dirname "$0")/env/keys/$PUBLIC_KEY.$KEY_FORMAT"
@@ -35,7 +33,7 @@ VARIABLES_LOG="$(dirname "$0")/logs/created_resourses.log"
 
 #Data files
 DATA_DIR="$(dirname "$0")/env/data/data.sql"
-DEFAULT_DB_FILE="$(dirname "$0")/env/data/sample_entries.sql"
+CHOSEN_DB_FILE="$(dirname "$0")/env/data/$DEFAULT_DB_FILE"
 USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
 USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
 
