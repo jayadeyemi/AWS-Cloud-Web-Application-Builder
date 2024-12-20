@@ -68,6 +68,13 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Enable DNS hostnames and support in the VPC
+if [[ $status -eq 0 ]]; then
+    execute_command "aws ec2 modify-vpc-attribute --vpc-id $MAIN_VPC_ID --enable-dns-hostnames '{\"Value\":true}'"
+    execute_command "aws ec2 modify-vpc-attribute --vpc-id $MAIN_VPC_ID --enable-dns-support '{\"Value\":true}'"
+    status=$?
+fi
+
 # Wait for the VPC to be available
 if [[ $status -eq 0 ]]; then
     execute_command "aws ec2 wait vpc-available --vpc-ids \"$MAIN_VPC_ID\""

@@ -74,6 +74,29 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Query to check if the secret exists
+if [[ $status -eq 0 ]]; then
+        execute_command "SECRET_EXISTS=\$(aws secretsmanager list-secrets --filter Key="name",Values=\"$SECRET_NAME\" --output text)"
+        status=$?
+fi
+
+# Create a new Secret for RDS
+if [[ $status -eq 0 ]]; then
+    if [[ -n "$SECRET_EXISTS" ]]; then
+        echo "Secret exists. Modifying contents..."
+        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
+        status=$?
+    else
+    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"user\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
+    status=$?
+    fi
+fi
+
+# Get the new EC2-v2 instance Public IP
+if [[ $status -eq 0 ]]; then
+    execute_command "NEW_INSTANCE_PUBLIC_IP=\$(aws ec2 describe-instances --instance-ids \"$NEW_INSTANCE_ID\" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)"
+    status=$?
+fi
 # Set permissions for saving the private key
 if [[ $status -eq 0 ]]; then
     execute_command "chmod 400 \"$PRIV_KEY\""
@@ -101,30 +124,6 @@ fi
 # Get the RDS endpoint
 if [[ $status -eq 0 ]]; then
     execute_command "RDS_ENDPOINT=\$(aws rds describe-db-instances --db-instance-identifier \"$RDS_INSTANCE\" --query 'DBInstances[0].Endpoint.Address' --output text)"
-    status=$?
-fi
-
-# Query to check if the secret exists
-if [[ $status -eq 0 ]]; then
-        execute_command "SECRET_EXISTS=\$(aws secretsmanager list-secrets --filter Key="name",Values=\"$SECRET_NAME\" --output text)"
-        status=$?
-fi
-
-# Create a new Secret for RDS
-if [[ $status -eq 0 ]]; then
-    if [[ -n "$SECRET_EXISTS" ]]; then
-        echo "Secret exists. Modifying contents..."
-        execute_command "SECRET_ARN=\$(aws secretsmanager put-secret-value --secret-id \"$SECRET_NAME\" --secret-string '{\"username\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --query 'ARN' --output text)"
-        status=$?
-    else
-    execute_command "SECRET_ARN=\$(aws secretsmanager create-secret --name \"$SECRET_NAME\" --description \"Database secret for web app\" --secret-string '{\"username\":\"$SECRET_USERNAME\",\"password\":\"$SECRET_PASSWORD\",\"host\":\"$RDS_ENDPOINT\",\"db\":\"$SECRET_DBNAME\"}' --force-overwrite-replica-secret --query 'ARN' --output text)"
-    status=$?
-    fi
-fi
-
-# Get the new EC2-v2 instance Public IP
-if [[ $status -eq 0 ]]; then
-    execute_command "NEW_INSTANCE_PUBLIC_IP=\$(aws ec2 describe-instances --instance-ids \"$NEW_INSTANCE_ID\" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)"
     status=$?
 fi
 

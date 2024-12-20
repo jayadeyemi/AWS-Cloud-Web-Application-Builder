@@ -6,18 +6,21 @@
 echo "############################################################################################################"
 echo "Starting Phase 4: Load Testing"
 echo "############################################################################################################"
-npm install -g loadtest || true
+# status check
+if [[ $status -eq 0 ]]; then
+    npm install -g loadtest || true
 
-echo "Running loadtest on the application"
-ELB_URL=$(aws elbv2 describe-load-balancers \
-    --names "$LB_NAME"
-    --query 'LoadBalancers[0].DNSName' \
-    --output text)
+    echo "Running loadtest on the application"
+    ELB_URL=$(aws elbv2 describe-load-balancers \
+        --names "$LB_NAME"
+        --query 'LoadBalancers[0].DNSName' \
+        --output text)
 
-loadtest \
-    --rps 1000 \
-    -c 500 \
-    -k "$LB_DNS" || true
+    loadtest \
+        --rps 1000 \
+        -c 500 \
+        -k "$LB_DNS" || true
+fi
 
 echo "############################################################################################################"
 echo "Load Testing executed"

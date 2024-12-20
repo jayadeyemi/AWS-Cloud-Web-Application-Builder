@@ -37,24 +37,37 @@ execute_phase() {
 
         if [[ "$cont" == "y" ]]; then
             log "$EXECUTION_LOG" "Executing Phase ${phase_num} (${phase_name})..."
-            source "$phase_file"
             if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "Phase ${phase_num} failed."
+                log "$EXECUTION_LOG" "Cannot execute Phase ${phase_num} failed due to previous errors."
                 return 1
+            else
+                source "$phase_file"
+                if [[ $? -ne 0 ]]; then
+                    log "$EXECUTION_LOG" "Phase ${phase_num} failed duringexecution."
+                    return 1
+                else
+                    log "$EXECUTION_LOG" "Phase ${phase_num} completed successfully."
+                fi
             fi
             break
         elif [[ "$cont" == "n" ]]; then
             log "$EXECUTION_LOG" "User chose to exit."
             exit 0
         elif [[ -z "$cont" && $timed_out -eq 0 ]]; then
-            log "$EXECUTION_LOG" "Skipping Phase ${phase_num} due to previously failed status."
+            log "$EXECUTION_LOG" "Skipping Phase ${phase_num}..."
             break
         elif [[ $timed_out -eq 1 ]]; then
             log "$EXECUTION_LOG" "Timeout reached. Automatically proceeding to Phase ${phase_num} (${phase_name})."
-            source "$phase_file"
             if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "Phase ${phase_num} failed on automatic execution."
-                return 1
+                log "$EXECUTION_LOG" "Phase ${phase_num} could not be eexecuted due to previous errors."
+            else
+                source "$phase_file"
+                if [[ $? -ne 0 ]]; then
+                    log "$EXECUTION_LOG" "Phase ${phase_num} failed during automatic execution."
+                    return 1
+                else
+                    log "$EXECUTION_LOG" "Phase ${phase_num} completed successfully."
+                fi
             fi
             break
         else

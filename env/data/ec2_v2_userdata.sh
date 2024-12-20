@@ -1,5 +1,7 @@
 #!/bin/bash -xe
 apt update -y
+apt upgrade -y
+sudo reboot
 apt install nodejs unzip wget npm mysql-client -y
 #wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACCAP1-1-DEV/code.zip -P /home/ubuntu
 wget https://aws-tc-largeobjects.s3.us-west-2.amazonaws.com/CUR-TF-200-ACCAP1-1-91571/1-lab-capstone-project-1/code.zip -P /home/ubuntu

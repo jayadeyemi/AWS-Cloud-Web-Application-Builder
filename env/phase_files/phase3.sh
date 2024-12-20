@@ -33,18 +33,16 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Authorize Access from ASG Security Group to Load Balancer Security Group
-if [[ $status -eq 0 ]]; then
-    execute_command "LB_SG_ASG_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$LB_SG_ID\" --protocol tcp --port 80 --source-group \"$ASG_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
-    status=$?
-fi
-
 # Authorize Access from Load Balancer Security Group to ASG Security Group
 if [[ $status -eq 0 ]]; then
     execute_command "ASG_SG_LB_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$ASG_SG_ID\" --protocol tcp --port 80 --source-group \"$LB_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
     status=$?
 fi
-
+# Authorize Access from ASG Security Group to DB Security Group
+if [[ $status -eq 0 ]]; then
+    execute_command "ASG_SG_DB_SG_ACCESS=\$(aws ec2 authorize-security-group-ingress --group-id \"$ASG_SG_ID\" --protocol tcp --port 3306 --source-group \"$RDS_SG_ID\" --query 'SecurityGroupRuleId' --output text)"
+    status=$?
+fi
 # Create a target group for the load balancer
 if [[ $status -eq 0 ]]; then
     execute_command "TG_ARN=\$(aws elbv2 create-target-group --name \"$TG_NAME\" --protocol HTTP --port 80 --vpc-id \"$MAIN_VPC_ID\" --tags Key=Name,Value=\"$TG_NAME\" --query 'TargetGroups[0].TargetGroupArn' --output text)"
