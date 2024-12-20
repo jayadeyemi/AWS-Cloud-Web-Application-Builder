@@ -188,6 +188,12 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Wait for the EC2-v2 instance to be fully operational
+if [[ $status -eq 0 ]]; then
+    execute_command "aws ec2 wait instance-status-ok --instance-ids \"$NEW_INSTANCE_ID\" --cli-read-timeout 0 --output text"
+    status=$?
+fi
+
 # Create an image of the EC2-v1 instance
 if [[ $status -eq 0 ]]; then
     execute_command "SERVER_V2_IMAGE_ID=\$(aws ec2 create-image --instance-id \"$NEW_INSTANCE_ID\" --name \"$EC2_IMAGE2_NAME\" --query 'ImageId' --output text)"
