@@ -29,7 +29,7 @@ for key_name in "$PUBLIC_KEY" "$PRIVATE_KEY"; do
 done
 
 # Scale down ASG before deletion
-aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$EC2_ASG_NAME" --min-size 0 --desired-capacity 0 || true
+aws autoscaling update-auto-scaling-group --auto-scaling-group-name "$ASG_NAME" --min-size 0 --desired-capacity 0 || true
 check_command_success ""
 
 # Terminate EC2 instances
@@ -109,7 +109,7 @@ if aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names "$EC2
 fi
 
 # List of security group IDs
-for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG", "$LB_SG", "$ASG_SG"; do
+for sg_id in "$EC2_V1_SG_ID" "$RDS_SG_ID" "$EC2_V2_SG_ID", "$LB_SG_ID", "$ASG_SG_ID"; do
     if [[ -n "$sg_id" ]]; then
         echo "Processing Security Group: $sg_id"
 
@@ -137,13 +137,18 @@ for sg_id in "$EC2_V1_SG_ID" "$RDS_SG" "$EC2_V2_SG", "$LB_SG", "$ASG_SG"; do
     fi
 done
 
-for sg_id in "$EC2_V1_SG" "$RDS_SG" "$EC2_V2_SG_NAME" "$LB_SG" "$ASG_SG"; do
+for sg_id in "$EC2_V1_SG_ID" "$RDS_SG_ID" "$EC2_V2_SG_ID", "$LB_SG_ID", "$ASG_SG_ID"; do
     echo "Deleting Security Groups..."
     if [ -n "$sg_id" ]; then
         aws ec2 delete-security-group --group-id "$sg_id" || true
         check_command_success ""
     fi
 done
+
+# wait for db instance to be deleted before deleting the security group
+if [ -n "$RDS_IDENTIFIER" ]; then
+    aws rds wait db-instance-deleted --db-instance-identifier "$RDS_IDENTIFIER" || true
+fi
 # Delete RDS DB Subnet Group
 echo "Deleting DB Subnet Group..."
 aws rds delete-db-subnet-group \
@@ -159,6 +164,10 @@ if [ -n "$NAT_GW_ID" ]; then
     aws ec2 delete-nat-gateway --nat-gateway-id "$NAT_GW_ID" || true
     aws ec2 wait nat-gateway-deleted --nat-gateway-ids "$NAT_GW_ID" || true
     check_command_success ""
+fi
+#wait for the NAT Gateway to be deleted before releasing the Elastic IP
+if [ -n "$NAT_GW_ID" ]; then
+    aws ec2 wait nat-gateway-deleted --nat-gateway-ids "$NAT_GW_ID" || true
 fi
 
 echo "Releasing Elastic IP..."
