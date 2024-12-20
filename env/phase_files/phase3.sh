@@ -15,13 +15,13 @@ echo -e "\n\n\n"
 
 # Create a security group for the load balancer
 if [[ $status -eq 0 ]]; then
-    execute_command "LB_SG_ID=\$(aws ec2 create-security-group --group-name \"$LB_SG_NAME\" --description \"Load Balancer Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --output text)"
+    execute_command "LB_SG_ID=\$(aws ec2 create-security-group --group-name \"$LB_SG_NAME\" --description \"Load Balancer Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=\"$LB_SG_NAME\"}]' --output text)"
     status=$?
 fi
 
 # Create a security group for the ASG
 if [[ $status -eq 0 ]]; then
-    execute_command "ASG_SG_ID=\$(aws ec2 create-security-group --group-name \"$ASG_SG_NAME\" --description \"ASG Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --output text)"
+    execute_command "ASG_SG_ID=\$(aws ec2 create-security-group --group-name \"$ASG_SG_NAME\" --description \"ASG Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=\"$ASG_SG_NAME\"}]' --output text)"
     status=$?
 fi
 
@@ -68,7 +68,7 @@ fi
 
 # Create an autoscaling group and attach the target group
 if [[ $status -eq 0 ]]; then
-    execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group --auto-scaling-group-name \"$ASG_NAME\" --launch-template LaunchTemplateId=\"$LAUNCH_TEMPLATE_ID\",Version=1 --min-size 2 --max-size 6 --desired-capacity 2 --target-group-arns \"$TG_ARN\" --vpc-zone-identifier \"$PRIV_SUBNET1,$PRIV_SUBNET2\" --health-check-type ELB --health-check-grace-period 300 --tags Key=Name,Value=\"$ASG_NAME\",PropagateAtLaunch=true)"
+    execute_command "ASG_GROUP=\$(aws autoscaling create-auto-scaling-group --auto-scaling-group-name \"$ASG_NAME\" --launch-template LaunchTemplateId=\"$LAUNCH_TEMPLATE_ID\",Version=1 --min-size 2 --max-size 6 --desired-capacity 2 --target-group-arns \"$TG_ARN\" --vpc-zone-identifier \"$PRIV_SUBNET1,$PRIV_SUBNET2\" --health-check-type ELB --health-check-grace-period 300 --tags ResourceId=\"\$ASG_NAME\",ResourceType=auto-scaling-group,Key=Name,Value=\"$ASG_NAME\",PropagateAtLaunch=true)"
     status=$?
 fi
 

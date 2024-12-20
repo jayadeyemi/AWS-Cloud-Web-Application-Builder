@@ -335,7 +335,7 @@ fi
 
 # Create a security group for EC2-V1 instance in the main VPC
 if [[ $status -eq 0 ]]; then
-    execute_command "EC2_V1_SG_ID=\$(aws ec2 create-security-group --group-name \"$EC2_V1_SG_NAME\" --description \"Inventory Server Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --output text)"
+    execute_command "EC2_V1_SG_ID=\$(aws ec2 create-security-group --group-name \"$EC2_V1_SG_NAME\" --description \"Inventory Server Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --tag-specifications \"ResourceType=security-group,Tags=[{Key=Name,Value=$EC2_V1_SG_NAME}]\" --output text)"
     status=$?
 fi
 
