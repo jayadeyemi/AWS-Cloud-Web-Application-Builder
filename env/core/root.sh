@@ -1,6 +1,8 @@
-####################################################################################################
-# Program Root
-####################################################################################################
+
+
+##################################################################################################################
+# Root Script for the Launcher
+##################################################################################################################
 
 # load environment variables
 source $variables_env
@@ -9,71 +11,104 @@ source $variables_env
 source $constants_env
 
 # load settings
-source $settings_sh
+source $config_sh
 
 # Load phase worker
 source $phase_worker_sh
 
-####################################################################################################
-# Main Worker Script
-####################################################################################################
+# Setting the region
+aws configure set region "$REGION"
 
-# Phase Worker Function
-execute_phase() {
-    local phase_num="$1"
-    local phase_file="$2"
-    local phase_name="$3"
-    local timed_out=0
+# ASG Target Value Modifier
+sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$ASG_CONFIG"
+# Obtain DB password
+echo "############################################################################################################"
+echo "# Variables Initialized"
+echo "# Press [y] to input a password, or"
+echo "# Press any other key to generate a random password."
+echo "############################################################################################################"
+read -t $DB_Password_wait -r -p "# User Input: " generate_password
+echo "############################################################################################################"
+echo -e "\n\n\n"
 
+if [[ "$generate_password" =~ ^[Yy]$ ]]; then
+    # User chooses to input their own password
     while true; do
+        read -s -r -p  "# Enter a password: " SECRET_PASSWORD
+        echo "#"
+        read -s -r -p  "# Confirm password: " confirm_password
+        if [[ "$SECRET_PASSWORD" == "$confirm_password" && "$SECRET_PASSWORD" != "" ]]; then
+            echo "# Passwords match"
+            echo "############################################################################################################"
+
+            break
+        else
+            echo "# Passwords do not match. Please try again."
+        fi
+    done
+else
+    # Generate a random password
+SECRET_PASSWORD=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
+
+echo "# Random password generated"
+echo "############################################################################################################"
+fi
+
+log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
+echo -e "\n\n\n"
+
+##################################################################################################################
+# Main loop
+##################################################################################################################
+
+# This script continuously loops to execute all phases until manually stopped
+main_launcher() {
+    while true; do
+        echo "############################################################################################################"
+        echo "# Prompts to Execute Phases 1-5"
+        echo "############################################################################################################"
+
+        # Execute each phase
+        execute_phase 1 "$PHASE_1_SCRIPT" "1st Instance Deployment" || continue
+        execute_phase 2 "$PHASE_2_SCRIPT" "2nd Instance Deployment" || continue
+        execute_phase 3 "$PHASE_3_SCRIPT" "Autoscaling Group Deployment" || continue
+        execute_phase 4 "$PHASE_4_SCRIPT" "Load-Tester for the Autoscaling Group" || continue
+        log "$EXECUTION_LOG" "All phases have been processed."
+
+        # Ask if the script should run again
+        echo "############################################################################################################"
+        echo "#                                        Clean Resources?                                                  #"
+        echo "############################################################################################################"
         echo "# Type 'y' to proceed to Phase ${phase_num},"
         echo "# Type 'n' to exit, or"
         echo "# [Press Enter to skip]"
-        read -t $PHASE_DELAY -r -p "# Proceed to Phase ${phase_num} (${phase_name})?: " cont
+        read -r -p "# User Input: " repeat
+        echo "############################################################################################################"
+        repeat="${repeat,,}"
 
-        if [[ $? -gt 0 ]]; then
-            timed_out=1
-        fi
-
-        cont="${cont,,}"
-
-        if [[ "$cont" == "y" ]]; then
-            log "$EXECUTION_LOG" "# Executing Phase ${phase_num} (${phase_name})..."
-            if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "# Cannot execute Phase ${phase_num} failed due to previous errors."
-                return 1
+        if [[ "$repeat" == "y" ]]; then
+            # execute_phase 5 "$PHASE_5_SCRIPT" "Clear Resources"
+            execute_phase 5 "$MAP_BUILD" "# Clear Resources"
+            return 0
+            read -r -p "# Press [Enter] to continue back to phase #1, or Type "n" to exit the script" repeat           
+            if [[ "$repeat" == "n" ]]; then
+                log "$EXECUTION_LOG" "# Exiting the script." 
+                break
+            elif [[ -z "$repeat" ]]; then
+                log "$EXECUTION_LOG" "# returning to phase 1."
             else
-                source "$phase_file"
-                if [[ $? -ne 0 ]]; then
-                    log "$EXECUTION_LOG" "# Phase ${phase_num} failed duringexecution."
-                    return 1
-                else
-                    log "$EXECUTION_LOG" "# Phase ${phase_num} completed successfully."
-                fi
-            fi
-            break
-        elif [[ "$cont" == "n" ]]; then
-            log "$EXECUTION_LOG" "# User chose to exit."
-            exit 0
-        elif [[ -z "$cont" && $timed_out -eq 0 ]]; then
-            log "$EXECUTION_LOG" "# Skipping Phase ${phase_num}..."
-            break
-        elif [[ $timed_out -eq 1 ]]; then
-            log "$EXECUTION_LOG" "# Timeout reached. Automatically proceeding to Phase ${phase_num} (${phase_name})."
-            if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "# Phase ${phase_num} could not be eexecuted due to previous errors."
-            else
-                source "$phase_file"
-                if [[ $? -ne 0 ]]; then
-                    log "$EXECUTION_LOG" "# Phase ${phase_num} failed during automatic execution."
-                    return 1
-                else
-                    log "$EXECUTION_LOG" "# Phase ${phase_num} completed successfully."
-                fi
-            fi
+                echo "3 Invalid input. returning to phase 1."
+        elif [[ "$repeat" == "n" ]]; then
+            log "$EXECUTION_LOG" "# Exiting the script."
             break
         else
-            echo "# Invalid input. Please enter 'y', 'n', or press Enter to skip."
+            echo "# Invalid input. Please enter 'y' or 'n' or press [Enter] to skip."
         fi
     done
 }
+
+# Run the main launcher
+main_launcher
+##################################################################################################################
+# End of launcher.sh
+##################################################################################################################

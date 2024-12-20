@@ -1,104 +1,58 @@
 #!/bin/bash
+####################################################################################################
+####################################################################################################
+# Program name: Launcher                                                                           #
+####################################################################################################
+#                                                                                                  #
+#                                                                                                  #
+####################################################################################################
+# Defining the environment variables                                                               #
+####################################################################################################
 
-##################################################################################################################
-# Root Launcher and Password Input
-##################################################################################################################
+# load environment variables
+variables_env="$(dirname "$0")/env/variables.env"
+constants_env="$(dirname "$0")/env/core/constants.env"
+config_sh="$(dirname "$0")/env/core/config.sh"
+phase_worker_sh="$(dirname "$0")/env/core/phase_worker.sh"
 
+
+#Path to key pair
+mkdir -p $(dirname "$0")/env/keys/
+PUB_KEY="$(dirname "$0")/env/keys/$PUBLIC_KEY.$KEY_FORMAT"
+PRIV_KEY="$(dirname "$0")/env/keys/$PRIVATE_KEY.$KEY_FORMAT"
+
+# Log files
+mkdir -p $(dirname "$0")/logs/
+EXECUTION_LOG="$(dirname "$0")/logs/execution.log"
+RESPONSE_LOG="$(dirname "$0")/logs/response.log"
+VARIABLES_LOG="$(dirname "$0")/logs/created_resourses.log"
+
+#Data files
+DATA_DIR="$(dirname "$0")/env/data/data.sql"
+CHOSEN_DB_FILE="$(dirname "$0")/env/data/$CHOSEN_DB"
+USER_DATA_FILE_V1="$(dirname "$0")/env/data/ec2_v1_userdata.sh"
+USER_DATA_FILE_V2="$(dirname "$0")/env/data/ec2_v2_userdata.sh"
+
+#Cleaner files - Testing
+mkdir -p $(dirname "$0")/env/core/cleaners
+CLEANER_DIR="$(dirname "$0")/env/core/cleaners"
+CALLER="$(dirname "$0")/env/core/caller.sh"
+MAP_BUILD="$(dirname "$0")/env/core/map_build.sh"
+
+# ASG Configuration file
+ASG_CONFIG="$(dirname "$0")/env/asg_config/config.json"
+
+# Phase scripts
+PHASE_1_SCRIPT="$(dirname "$0")/env/phase_files/phase1.sh"
+PHASE_2_SCRIPT="$(dirname "$0")/env/phase_files/phase2.sh"
+PHASE_3_SCRIPT="$(dirname "$0")/env/phase_files/phase3.sh"
+PHASE_4_SCRIPT="$(dirname "$0")/env/phase_files/phase4.sh"
+PHASE_5_SCRIPT="$(dirname "$0")/env/phase_files/phase5.sh"
+
+####################################################################################################
+# Loader
+####################################################################################################
 source "$(dirname "$0")/env/core/root.sh"
-
-# Setting the region
-aws configure set region "$REGION"
-
-# ASG Target Value Modifier
-sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$ASG_CONFIG"
-# Obtain DB password
-echo "############################################################################################################"
-echo "# Variables Initialized"
-echo "# Press [y] to input a password, or"
-echo "# Press any other key to generate a random password."
-echo "############################################################################################################"
-read -t $DB_Password_wait -r -p "# User Input: " generate_password
-echo "############################################################################################################"
-echo -e "\n\n\n"
-
-if [[ "$generate_password" =~ ^[Yy]$ ]]; then
-    # User chooses to input their own password
-    while true; do
-        read -s -r -p  "# Enter a password: " SECRET_PASSWORD
-        echo "#"
-        read -s -r -p  "# Confirm password: " confirm_password
-        if [[ "$SECRET_PASSWORD" == "$confirm_password" && "$SECRET_PASSWORD" != "" ]]; then
-            echo "# Passwords match"
-            echo "############################################################################################################"
-
-            break
-        else
-            echo "# Passwords do not match. Please try again."
-        fi
-    done
-else
-    # Generate a random password
-SECRET_PASSWORD=$(openssl rand -base64 12 | tr -dc 'a-zA-Z0-9' | head -c 12)
-
-echo "# Random password generated"
-echo "############################################################################################################"
-fi
-
-log "$VARIABLES_LOG" "SECRET_PASSWORD=$SECRET_PASSWORD"
-echo -e "\n\n\n"
-
-##################################################################################################################
-# Main loop
-##################################################################################################################
-
-# This script continuously loops to execute all phases until manually stopped
-main_launcher() {
-    while true; do
-        echo "############################################################################################################"
-        echo "# Prompts to Execute Phases 1-5"
-        echo "############################################################################################################"
-
-        # Execute each phase
-        execute_phase 1 "$PHASE_1_SCRIPT" "1st Instance Deployment" || continue
-        execute_phase 2 "$PHASE_2_SCRIPT" "2nd Instance Deployment" || continue
-        execute_phase 3 "$PHASE_3_SCRIPT" "Autoscaling Group Deployment" || continue
-        execute_phase 4 "$PHASE_4_SCRIPT" "Load-Tester for the Autoscaling Group" || continue
-        log "$EXECUTION_LOG" "All phases have been processed."
-
-        # Ask if the script should run again
-        echo "############################################################################################################"
-        echo "#                                        Clean Resources?                                                  #"
-        echo "############################################################################################################"
-        echo "# Type 'y' to proceed to Phase ${phase_num},"
-        echo "# Type 'n' to exit, or"
-        echo "# [Press Enter to skip]"
-        read -r -p "# User Input: " repeat
-        echo "############################################################################################################"
-        repeat="${repeat,,}"
-
-        if [[ "$repeat" == "y" ]]; then
-            # execute_phase 5 "$PHASE_5_SCRIPT" "Clear Resources"
-            execute_phase 5 "$MAP_BUILD" "# Clear Resources"
-            return 0
-            read -r -p "# Press [Enter] to continue back to phase #1, or Type "n" to exit the script" repeat           
-            if [[ "$repeat" == "n" ]]; then
-                log "$EXECUTION_LOG" "# Exiting the script." 
-                break
-            elif [[ -z "$repeat" ]]; then
-                log "$EXECUTION_LOG" "# returning to phase 1."
-            else
-                echo "3 Invalid input. returning to phase 1."
-        elif [[ "$repeat" == "n" ]]; then
-            log "$EXECUTION_LOG" "# Exiting the script."
-            break
-        else
-            echo "# Invalid input. Please enter 'y' or 'n' or press [Enter] to skip."
-        fi
-    done
-}
-
-# Run the main launcher
-main_launcher
-##################################################################################################################
-# End of launcher.sh
-##################################################################################################################
+####################################################################################################
+# End of Program Launcher
+####################################################################################################
