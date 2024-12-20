@@ -67,26 +67,32 @@ main_launcher() {
 
         # Ask if the script should run again
         echo "############################################################################################################"
-        echo "# Press 'n' to clear all resources and exit the script, or"
-        echo "# Press [Enter] to restart the script, or"
-        echo "# Press any other key to exit the script."
+        echo "#                                        Clean Resources?                                                  #"
+        echo "############################################################################################################"
+        echo "# Type 'y' to proceed to Phase ${phase_num},"
+        echo "# Type 'n' to exit, or"
+        echo "# [Press Enter to skip]"
         read -r -p "# User Input: " repeat
         echo "############################################################################################################"
         repeat="${repeat,,}"
 
-        if [[ "$repeat" == "n" ]]; then
-            execute_phase 5 "$PHASE_5_SCRIPT" "Clear Resources"
-            log "$EXECUTION_LOG" "Phase 5 completed."
-            read -r -p "# Press [Enter] to continue back to phase #1, or Press any other key to exit the script." repeat
-            
-            if [[ "$repeat" != "" ]]; then
-                log "$EXECUTION_LOG" "Exiting the script."
+        if [[ "$repeat" == "y" ]]; then
+            # execute_phase 5 "$PHASE_5_SCRIPT" "Clear Resources"
+            execute_phase 5 "$MAP_BUILD" "# Clear Resources"
+            return 0
+            read -r -p "# Press [Enter] to continue back to phase #1, or Type "n" to exit the script" repeat           
+            if [[ "$repeat" == "n" ]]; then
+                log "$EXECUTION_LOG" "# Exiting the script." 
                 break
-            fi
-
-        elif [[ "$repeat" != "" ]]; then
-            log "$EXECUTION_LOG" "Exiting the script."
+            elif [[ -z "$repeat" ]]; then
+                log "$EXECUTION_LOG" "# returning to phase 1."
+            else
+                echo "3 Invalid input. returning to phase 1."
+        elif [[ "$repeat" == "n" ]]; then
+            log "$EXECUTION_LOG" "# Exiting the script."
             break
+        else
+            echo "# Invalid input. Please enter 'y' or 'n' or press [Enter] to skip."
         fi
     done
 }
