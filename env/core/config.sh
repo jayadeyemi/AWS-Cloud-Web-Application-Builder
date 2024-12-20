@@ -18,7 +18,7 @@ else
 fi
 
 # Set the DB dump file to use
-if $USE_DEFAULT_DB==true; then
+if [ "$USE_DEFAULT_DB" == "true" ]; then
     CHOSEN_DB="sample_entries.sql"
 else
     CHOSEN_DB="data.sql"
