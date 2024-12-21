@@ -28,6 +28,8 @@ fi
 # Create a launch template for ASG
 if [[ $status -eq 0 ]]; then
     execute_command "LAUNCH_TEMPLATE_ID=\$(aws ec2 create-launch-template --launch-template-name \"$LAUNCH_TEMPLATE_NAME\" --version-description \"Initial version\" --launch-template-data '{\"ImageId\":\"$SERVER_V2_IMAGE_ID\",\"InstanceType\":\"t2.micro\",\"KeyName\":\"$PRIVATE_KEY\",\"SecurityGroupIds\":[\"$ASG_SG_ID\"]}' --query 'LaunchTemplate.LaunchTemplateId' --output text)"
+    execute_command "LAUNCH_TEMPLATE_ID=\$(aws ec2 create-launch-template --launch-template-name \"$LAUNCH_TEMPLATE_NAME\" --version-description \"Initial version\" --launch-template-data '{\"ImageId\":\"$SERVER_V2_IMAGE_ID\",\"InstanceType\":\"t2.micro\",\"KeyName\":\"$PRIVATE_KEY\",\"SecurityGroupIds\":[\"$ASG_SG_ID\"],\"IamInstanceProfile\":{\"Name\":\"$INVENTORY_SERVER_ROLE\"}}' --query 'LaunchTemplate.LaunchTemplateId' --output text)"
+
     status=$?
 fi
 
