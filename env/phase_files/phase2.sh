@@ -92,6 +92,16 @@ if [[ $status -eq 0 ]]; then
     execute_command "RDS_INSTANCE=\$(aws rds create-db-instance --db-instance-identifier \"$RDS_IDENTIFIER\" --db-instance-class db.t3.micro --storage-type gp3 --allocated-storage 20 --no-multi-az --engine mysql --db-subnet-group-name \"$DB_SUBNET_GROUP_NAME\" --availability-zone \"$AVAILABILITY_ZONE1\" --master-username \"$SECRET_USERNAME\" --master-user-password \"$SECRET_PASSWORD\" --vpc-security-group-ids \"$RDS_SG_ID\" --backup-retention-period 1 --no-enable-performance-insights --query 'DBInstance.DBInstanceIdentifier' --output text)"
     status=$?
 fi
+# Wait for the RDS instance to be available
+if [[ $status -eq 0 ]]; then
+    execute_command "aws rds wait db-instance-available --db-instance-identifier \"$RDS_INSTANCE\" --cli-read-timeout 0"
+    status=$?
+fi
+# Get the RDS endpoint
+if [[ $status -eq 0 ]]; then
+    execute_command "RDS_ENDPOINT=\$(aws rds describe-db-instances --db-instance-identifier \"$RDS_INSTANCE\" --query 'DBInstances[0].Endpoint.Address' --output text)"
+    status=$?
+fi
 
 # Create a new Secret for RDS
 if [[ $status -eq 0 ]]; then
@@ -105,6 +115,7 @@ if [[ $status -eq 0 ]]; then
     fi
 fi
 
+sleep 120
 
 # Create a new EC2-v2 instance
 if [[ $status -eq 0 ]]; then
@@ -112,17 +123,8 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Wait for the RDS instance to be available
-if [[ $status -eq 0 ]]; then
-    execute_command "aws rds wait db-instance-available --db-instance-identifier \"$RDS_INSTANCE\" --cli-read-timeout 0"
-    status=$?
-fi
 
-# Get the RDS endpoint
-if [[ $status -eq 0 ]]; then
-    execute_command "RDS_ENDPOINT=\$(aws rds describe-db-instances --db-instance-identifier \"$RDS_INSTANCE\" --query 'DBInstances[0].Endpoint.Address' --output text)"
-    status=$?
-fi
+
 
 # Get the new EC2-v2 instance Public IP
 if [[ $status -eq 0 ]]; then
