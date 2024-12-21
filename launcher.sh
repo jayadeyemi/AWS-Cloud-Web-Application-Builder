@@ -18,7 +18,7 @@ phase_worker_sh="$(dirname "$0")/env/core/phase_worker.sh"
 
 #Path to key pair
 mkdir -p $(dirname "$0")/env/keys/
-DB_DR="$(dirname "$0")/env/keys/"
+KEY_PATH="$(dirname "$0")/env/keys/"
 
 # Log files
 mkdir -p $(dirname "$0")/logs/

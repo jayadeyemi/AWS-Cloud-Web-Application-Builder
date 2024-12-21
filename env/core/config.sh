@@ -27,7 +27,7 @@ fi
 # Path to Input files
 CHOSEN_DB_FILE="$DB_DR$CHOSEN_DB"
 PUB_KEY="$KEY_PATH$PUBLIC_KEY.$KEY_FORMAT"
-PRIV_KEY="$KEYPATH$PRIVATE_KEY.$KEY_FORMAT"
+PRIV_KEY="$KEY_PATH$PRIVATE_KEY.$KEY_FORMAT"
 
 ####################################################################################################
 # End of settings.sh
