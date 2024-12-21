@@ -123,8 +123,13 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+# Wait for the EC2-v2 instance to be fully operational
+if [[ $status -eq 0 ]]; then
+    execute_command "aws ec2 wait instance-status-ok --instance-ids \"$NEW_INSTANCE_ID\" --cli-read-timeout 0 --output text"
+    status=$?
+fi
 
-
+sleep 120
 
 # Get the new EC2-v2 instance Public IP
 if [[ $status -eq 0 ]]; then
@@ -138,6 +143,7 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+wait 300
 echo -e "\n\n\n"
 # Step 1: Login to the EC2 instance v2 and export the database
 if [[ $status -eq 0 ]]; then
@@ -190,11 +196,6 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
-# Wait for the EC2-v2 instance to be fully operational
-if [[ $status -eq 0 ]]; then
-    execute_command "aws ec2 wait instance-status-ok --instance-ids \"$NEW_INSTANCE_ID\" --cli-read-timeout 0 --output text"
-    status=$?
-fi
 
 # Create an image of the EC2-v1 instance
 if [[ $status -eq 0 ]]; then
@@ -208,6 +209,7 @@ if [[ $status -eq 0 ]]; then
     status=$?
 fi
 
+ sleep 120
 # Shutdown the both EC2 instances
 # if [[ $status -eq 0 ]]; then
 #     execute_command "aws ec2 stop-instances --instance-ids \"$INSTANCE_ID\" \"$NEW_INSTANCE_ID\""
