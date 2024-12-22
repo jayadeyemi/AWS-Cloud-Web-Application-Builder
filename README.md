@@ -157,7 +157,8 @@ Run the deployment commands provided in the project's README or deployment scrip
    . ./launcher.sh
 ```
 ---
-
+---
+---
 #### Conclusion
 This project provides a comprehensive solution for automating the provisioning, partial management, and cleanup of AWS resources for a web application. By following the phases of execution, users can set up a scalable and robust infrastructure with ease. (30 minutes to 45 minute deployment time)
 
