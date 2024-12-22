@@ -30,7 +30,7 @@ The code is organized into five phases, each handling a specific aspect of the i
 4. **Logging and Error Handling**: Extensive logs are maintained for execution and error tracking.
 5. **Cleanup Utility**: Scripts to delete and clean up resources.
 
-# Display the image of the architecture from the folder
+---
 ![Architecture](images/Architectural_Diagram.png)
 
 
