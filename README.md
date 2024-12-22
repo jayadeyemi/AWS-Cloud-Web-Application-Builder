@@ -14,9 +14,8 @@
             ├── root.sh                ├── phase1.sh         ├── ec2_v1_userdata.sh              ├── config.json 
             ├── phase_worker.sh        ├── phase2.sh         ├── ec2_v2_userdata.sh
             ├── config.sh              ├── phase3.sh         ├── sample_entries.sql
-            ├── map_build.sh           ├── phase4.sh 
-            ├── caller.sh              ├── phase5.sh 
-            ├── constants.env 
+            ├── constants.env          ├── phase4.sh 
+                                       ├── phase5.sh 
 
 ## Overview
 This project provides an automated system for provisioning and managing an AWS-based infrastructure for a web application. It includes scripts to configure Virtual Private Clouds (VPCs), subnets, EC2 instances, RDS databases, autoscaling, load balancing, and cleanup of resources during deployment.
