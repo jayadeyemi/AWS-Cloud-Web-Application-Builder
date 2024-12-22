@@ -13,6 +13,18 @@ echo "# Starting Phase 3: Load Balancer and Auto Scaling Setup"
 echo "############################################################################################################"
 echo -e "\n\n\n"
 
+# Create a new key pair for EC2-v2 instance
+if [[ $status -eq 0 ]]; then
+    execute_command "aws ec2 create-key-pair --key-name \"$PRIVATE_KEY\" --key-type rsa --key-format \"$KEY_FORMAT\" --query 'KeyMaterial' --output text > \"$PRIV_KEY\""
+    status=$?
+fi
+
+# Set permissions for saving the private key
+if [[ $status -eq 0 ]]; then
+    execute_command "chmod 400 \"$PRIV_KEY\""
+    status=$?
+fi
+
 # Create a security group for the load balancer
 if [[ $status -eq 0 ]]; then
     execute_command "LB_SG_ID=\$(aws ec2 create-security-group --group-name \"$LB_SG_NAME\" --description \"Load Balancer Security Group\" --vpc-id \"$MAIN_VPC_ID\" --query 'GroupId' --tag-specifications 'ResourceType=security-group,Tags=[{Key=Name,Value=\"$LB_SG_NAME\"}]' --output text)"

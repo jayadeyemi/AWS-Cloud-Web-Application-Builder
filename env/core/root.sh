@@ -1,5 +1,3 @@
-
-
 ##################################################################################################################
 # Root Script for the Launcher
 ##################################################################################################################
@@ -21,6 +19,7 @@ aws configure set region "$REGION"
 
 # ASG Target Value Modifier
 sed -i "s/\"TargetValue\": [^,]*/\"TargetValue\": $ASG_TARGET/" "$ASG_CONFIG"
+
 # Obtain DB password
 echo "############################################################################################################"
 echo "# Variables Initialized"
@@ -88,7 +87,6 @@ main_launcher() {
 
         if [[ "$repeat" == "y" ]]; then
             execute_phase 5 "$PHASE_5_SCRIPT" "Resource Deletion"
-            # execute_phase 5 "$MAP_BUILD" "Resource Deletion"
             return 0
             read -r -p "# Press [Enter] to continue back to phase #1, or Type 'n' to exit the script" repeat           
             if [[ "$repeat" == "n" ]]; then
