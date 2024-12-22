@@ -108,7 +108,7 @@ execute_phase() {
             else
                 source "$phase_file"
                 if [[ $? -ne 0 ]]; then
-                    log "$EXECUTION_LOG" "# Phase ${phase_num} failed duringexecution."
+                    log "$EXECUTION_LOG" "# Phase ${phase_num} failed during execution."
                     return 1
                 else
                     log "$EXECUTION_LOG" "# Phase ${phase_num} completed successfully."
@@ -124,7 +124,7 @@ execute_phase() {
         elif [[ $timed_out -eq 1 ]]; then
             log "$EXECUTION_LOG" "# Timeout reached. Automatically proceeding to Phase ${phase_num} (${phase_name})."
             if [[ $? -ne 0 ]]; then
-                log "$EXECUTION_LOG" "# Phase ${phase_num} could not be eexecuted due to previous errors."
+                log "$EXECUTION_LOG" "# Phase ${phase_num} could not be executed due to previous errors."
             else
                 source "$phase_file"
                 if [[ $? -ne 0 ]]; then
