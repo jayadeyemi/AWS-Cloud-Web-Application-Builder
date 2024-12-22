@@ -18,7 +18,8 @@
                                        ├── phase5.sh 
 
 ## Overview
-This project provides an automated system for provisioning and managing an AWS-based infrastructure for a web application. It includes scripts to configure Virtual Private Clouds (VPCs), subnets, EC2 instances, RDS databases, autoscaling, load balancing, and cleanup of resources during deployment.
+This project provides an automated system for provisioning and managing an AWS-based infrastructure for a web application. 
+It includes scripts to configure Virtual Private Clouds (VPCs), subnets, EC2 instances, RDS databases, autoscaling, load balancing, and cleanup of resources during deployment.
 The code is organized into five phases, each handling a specific aspect of the infrastructure setup. The system is designed to be modular and extensible, allowing users to customize configurations and add new features as needed.
 ---
 
