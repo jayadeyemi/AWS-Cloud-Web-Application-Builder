@@ -1,8 +1,29 @@
-# AWS Projects
+# AWS Project Documentation
+---
 
-# Project Documentation
+## Overview
 
-## Project Structure
+
+
+This project provides an automated system for provisioning and managing an AWS-based infrastructure for a web application. 
+
+It includes scripts to configure Virtual Private Clouds (VPCs), subnets, EC2 instances, RDS databases, autoscaling, load balancing, and cleanup of resources during deployment.
+
+The code is organized into five phases, each handling a specific aspect of the infrastructure setup. The system is designed to be modular and extensible, allowing users to customize configurations and add new features as needed.
+
+---
+![Architecture](images/Architectural_Diagram.png)
+---
+## Key Features
+1. **Infrastructure Automation**: Provisioning AWS resources such as EC2 instances, RDS databases, subnets, security groups, load balancers, and autoscaling groups.
+2. **Database Management**: Migration of database content from local storage to an RDS instance.
+3. **Scalability**: Autoscaling configuration to handle varying loads.
+4. **Logging and Error Handling**: Extensive logs are maintained for execution and error tracking.
+5. **Cleanup Utility**: Scripts to delete and clean up resources.
+
+
+## Stages of Execution
+                                      
      ______________
     /_AWS-Project_./
        │ │        ├── launcher.sh
@@ -16,42 +37,6 @@
             ├── config.sh              ├── phase3.sh         ├── sample_entries.sql
             ├── constants.env          ├── phase4.sh 
                                        ├── phase5.sh 
-
-## Overview
-This project provides an automated system for provisioning and managing an AWS-based infrastructure for a web application. 
-It includes scripts to configure Virtual Private Clouds (VPCs), subnets, EC2 instances, RDS databases, autoscaling, load balancing, and cleanup of resources during deployment.
-The code is organized into five phases, each handling a specific aspect of the infrastructure setup. The system is designed to be modular and extensible, allowing users to customize configurations and add new features as needed.
----
-
-## Key Features
-1. **Infrastructure Automation**: Provisioning AWS resources such as EC2 instances, RDS databases, subnets, security groups, load balancers, and autoscaling groups.
-2. **Database Management**: Migration of database content from local storage to an RDS instance.
-3. **Scalability**: Autoscaling configuration to handle varying loads.
-4. **Logging and Error Handling**: Extensive logs are maintained for execution and error tracking.
-5. **Cleanup Utility**: Scripts to delete and clean up resources.
-
----
-![Architecture](images/Architectural_Diagram.png)
-
-
----
-
-## Stages of Execution
-                                      
-     launcher.sh  
-     __│ │____                                           
-    /root.sh/                                               
-       │ │  ├── variables.env                                              
-       │ │  ├── launcher.env                                                     
-      _│ │_________________________________________________________________________________________
-     /_core_./           /_phase_files_./             /_data_./                     /_asg_config_./
-            ├── root.sh                ├── phase1.sh         ├── ec2_v1_userdata.sh              ├── config.json 
-            ├── settings.sh            ├── phase2.sh         ├── ec2_v2_userdata.sh
-            ├── phase_worker.sh        ├── phase3.sh         ├── sample_entries
-            ├── config.sh              ├── phase4.sh 
-            ├── map_build.sh           ├── phase5.sh 
-            ├── caller.sh  
-            ├── constants.sh 
 
 #### 1.  System launcher.sh
 The system launcher script `launcher.sh` is the entry point for executing the infrastructure setup. It defines the folder structure and calls the `root.sh` script to start the process.
